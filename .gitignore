@@ -1,0 +1,8 @@
+.next
+node_modules
+.env
+.env.local
+firebase-debug.log
+firestore-debug.log
+storage-debug.log
+*.tsbuildinfo
