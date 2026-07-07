@@ -1,10 +1,10 @@
 "use client";
 
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, updateProfile } from "firebase/auth";
-import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DuewiseLogo } from "@/components/ui/duewise-logo";
 import { Input, Label } from "@/components/ui/input";
 import { auth, googleProvider } from "@/lib/firebase/client";
 
@@ -36,15 +36,9 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
 
   return (
     <main className="grid min-h-screen place-items-center bg-mist px-4">
-      <section className="w-full max-w-md rounded-lg border border-ink/10 bg-white p-6 shadow-soft">
+      <section className="w-full max-w-md rounded-lg border border-ink/10 bg-white p-6 shadow-soft dark:bg-[#111817]">
         <div className="mb-6 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-md bg-ink text-white">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold text-ink">Duewise</h1>
-            <p className="text-sm text-ink/55">Never miss a real-life deadline again.</p>
-          </div>
+          <DuewiseLogo />
         </div>
         <form className="grid gap-4" onSubmit={submit}>
           {signup && (

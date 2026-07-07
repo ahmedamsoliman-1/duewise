@@ -198,7 +198,7 @@ export function ResourcePage({
               </thead>
               <tbody className="divide-y divide-ink/10">
                 {filtered.map((item) => (
-                  <tr key={String(item.id)} className="bg-white">
+                  <tr key={String(item.id)} className="bg-white dark:bg-[#111817]">
                     {columns.map((column) => (
                       <td key={column.key} className="px-4 py-3 text-ink/75">
                         {column.format ? column.format(item[column.key], item) : String(item[column.key] ?? "-")}

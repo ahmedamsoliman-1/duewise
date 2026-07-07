@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  SunMoon,
   Users
 } from "lucide-react";
 import { signOut } from "firebase/auth";
@@ -17,6 +18,8 @@ import { usePathname } from "next/navigation";
 import { auth } from "@/lib/firebase/client";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useTheme } from "@/components/layout/theme-provider";
+import { DuewiseLogo } from "@/components/ui/duewise-logo";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -32,6 +35,7 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { loading, user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const isPublic = pathname === "/login" || pathname === "/signup";
 
   if (isPublic) return <>{children}</>;
@@ -46,14 +50,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-mist lg:flex">
-      <aside className="border-b border-ink/10 bg-white lg:fixed lg:inset-y-0 lg:w-72 lg:border-b-0 lg:border-r">
+      <aside className="border-b border-ink/10 bg-white lg:fixed lg:inset-y-0 lg:w-72 lg:border-b-0 lg:border-r dark:bg-[#111817]">
         <div className="flex h-full flex-col p-4">
           <Link href="/dashboard" className="mb-5 flex items-center gap-3 rounded-md px-2 py-3">
-            <span className="grid h-10 w-10 place-items-center rounded-md bg-ink text-white">D</span>
-            <span>
-              <span className="block text-lg font-semibold">Duewise</span>
-              <span className="text-xs text-ink/55">Life admin command center</span>
-            </span>
+            <DuewiseLogo />
           </Link>
           <nav className="grid gap-1">
             {navItems.map((item) => {
@@ -76,8 +76,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
           <button
             type="button"
-            onClick={() => signOut(auth)}
+            onClick={toggleTheme}
             className="mt-6 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink/60 transition hover:bg-mist hover:text-ink lg:mt-auto"
+          >
+            <SunMoon className="h-4 w-4" />
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
+          <button
+            type="button"
+            onClick={() => signOut(auth)}
+            className="mt-1 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink/60 transition hover:bg-mist hover:text-ink"
           >
             <LogOut className="h-4 w-4" />
             Sign out

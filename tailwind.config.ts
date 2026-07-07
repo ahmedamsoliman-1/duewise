@@ -5,11 +5,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#17201c",
-        mist: "#f4f7f4",
-        sage: "#49685a",
-        clay: "#a65f3d",
-        skyglass: "#dbe9ee"
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        mist: "rgb(var(--color-mist) / <alpha-value>)",
+        sage: "rgb(var(--color-sage) / <alpha-value>)",
+        clay: "rgb(var(--color-clay) / <alpha-value>)",
+        skyglass: "rgb(var(--color-skyglass) / <alpha-value>)"
       },
       boxShadow: {
         soft: "0 18px 50px rgba(23, 32, 28, 0.08)"
