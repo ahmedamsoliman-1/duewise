@@ -1,6 +1,6 @@
 # Duewise
 
-Duewise is a single Next.js Backend-for-Frontend app for personal life admin: deadlines, documents, subscriptions, inventory, family members, dashboard aggregation, and timeline aggregation.
+Duewise is a single Next.js Backend-for-Frontend app for personal life admin and life history: deadlines, documents, subscriptions, inventory, family members, life events, dashboard aggregation, and timeline aggregation.
 
 ## Stack
 
@@ -44,6 +44,7 @@ users/{userId}/documents/{documentId}
 users/{userId}/subscriptions/{subscriptionId}
 users/{userId}/inventory/{itemId}
 users/{userId}/familyMembers/{memberId}
+users/{userId}/lifeEvents/{eventId}
 ```
 
 Storage paths:
@@ -64,6 +65,7 @@ The app uses one codebase for frontend pages and server-side BFF routes:
 - `/api/inventory`
 - `/api/inventory/upload-url`
 - `/api/family`
+- `/api/life-events`
 - `/api/dashboard`
 - `/api/timeline`
 - `/api/export`

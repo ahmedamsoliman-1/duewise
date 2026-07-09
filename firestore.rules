@@ -32,6 +32,10 @@ service cloud.firestore {
       match /familyMembers/{memberId} {
         allow read, create, update, delete: if owns(userId);
       }
+
+      match /lifeEvents/{eventId} {
+        allow read, create, update, delete: if owns(userId);
+      }
     }
   }
 }

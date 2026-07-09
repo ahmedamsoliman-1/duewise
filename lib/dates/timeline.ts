@@ -1,11 +1,12 @@
 import { compareAsc, parseISO } from "date-fns";
-import type { DuewiseDocument, InventoryItem, Subscription, Task, TimelineEvent } from "@/types";
+import type { DuewiseDocument, InventoryItem, LifeEvent, Subscription, Task, TimelineEvent } from "@/types";
 
 export function buildTimelineEvents(input: {
   tasks: Task[];
   documents: DuewiseDocument[];
   subscriptions: Subscription[];
   inventory: InventoryItem[];
+  lifeEvents?: LifeEvent[];
 }) {
   const events: TimelineEvent[] = [
     ...input.tasks
@@ -47,7 +48,19 @@ export function buildTimelineEvents(input: {
         date: item.warrantyExpiryDate!,
         label: item.category,
         href: "/inventory"
-      }))
+      })),
+    ...(input.lifeEvents ?? []).map((event) => ({
+      id: `lifeEvent-${event.id}`,
+      source: "lifeEvent" as const,
+      title: event.title,
+      date: event.date,
+      endDate: event.endDate,
+      label: event.type,
+      href: "/life-events",
+      importance: event.importance,
+      personName: event.personName,
+      location: event.location
+    }))
   ];
 
   return events.sort((a, b) => compareAsc(parseISO(a.date), parseISO(b.date)));

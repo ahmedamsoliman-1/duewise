@@ -70,8 +70,34 @@ export const familySchema = z.object({
   notes: optionalText
 });
 
+export const lifeEventSchema = z.object({
+  title: z.string().trim().min(1),
+  type: z.enum([
+    "graduation",
+    "work",
+    "national service",
+    "wedding",
+    "birth",
+    "death",
+    "relocation",
+    "medical",
+    "property",
+    "legal",
+    "custom"
+  ]),
+  date,
+  endDate: optionalDate,
+  personName: optionalText,
+  familyMemberId: optionalText,
+  location: optionalText,
+  importance: z.enum(["low", "medium", "high", "landmark"]).default("medium"),
+  privacy: z.enum(["normal", "sensitive"]).default("normal"),
+  notes: optionalText
+});
+
 export type TaskInput = z.infer<typeof taskSchema>;
 export type DocumentInput = z.infer<typeof documentSchema>;
 export type SubscriptionInput = z.infer<typeof subscriptionSchema>;
 export type InventoryInput = z.infer<typeof inventorySchema>;
 export type FamilyInput = z.infer<typeof familySchema>;
+export type LifeEventInput = z.infer<typeof lifeEventSchema>;
