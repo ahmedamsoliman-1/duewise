@@ -17,23 +17,14 @@ import { Button } from "@/components/ui/button";
 import { DuewiseLogo } from "@/components/ui/duewise-logo";
 import { Input, Label } from "@/components/ui/input";
 import { auth, googleProvider } from "@/lib/firebase/client";
+import { friendlyAuthError } from "@/lib/errors/auth-messages";
+import { reportUnexpectedError } from "@/lib/observability/report";
 
 const highlights = [
   { icon: CalendarClock, title: "Never miss a due date", body: "Renewals, bills, and appointments surfaced before they bite." },
   { icon: FileText, title: "Every document, in reach", body: "Passports, warranties, and policies organized and searchable." },
   { icon: ShieldCheck, title: "Yours alone", body: "Per-account isolation with optional authenticator-app 2FA." }
 ];
-
-function friendlyError(error: unknown) {
-  if (!(error instanceof Error)) return "Something went wrong.";
-  const message = error.message.replace("Firebase: ", "");
-  if (message.includes("auth/invalid-credential") || message.includes("auth/wrong-password"))
-    return "Incorrect email or password.";
-  if (message.includes("auth/email-already-in-use")) return "That email already has an account.";
-  if (message.includes("auth/invalid-email")) return "That email address looks invalid.";
-  if (message.includes("auth/too-many-requests")) return "Too many attempts. Please wait a moment.";
-  return message.replace(/\(auth.*\)\.?/, "").trim() || "Authentication failed.";
-}
 
 export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   const signup = mode === "signup";
@@ -54,7 +45,8 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
       setError("");
       return;
     }
-    setError(friendlyError(nextError));
+    reportUnexpectedError("auth-signin", nextError);
+    setError(friendlyAuthError(nextError, "We couldn't sign you in. Please try again."));
   }
 
   async function submit(event: React.FormEvent) {
@@ -97,7 +89,8 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
       const assertion = TotpMultiFactorGenerator.assertionForSignIn(hint.uid, totpCode.trim());
       await resolver.resolveSignIn(assertion);
     } catch (nextError) {
-      setError(friendlyError(nextError));
+      reportUnexpectedError("mfa-signin", nextError);
+      setError(friendlyAuthError(nextError, "We couldn't verify that code. Please try again."));
     } finally {
       setBusy("");
     }

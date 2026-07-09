@@ -33,6 +33,8 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api/client";
 import { auth } from "@/lib/firebase/client";
+import { friendlyAuthError } from "@/lib/errors/auth-messages";
+import { reportUnexpectedError } from "@/lib/observability/report";
 
 type Message = { type: "success" | "error"; text: string };
 
@@ -41,17 +43,9 @@ const providerLabels: Record<string, string> = {
   password: "Email & password"
 };
 
-function friendlyError(error: unknown) {
-  if (!(error instanceof Error)) return "Something went wrong.";
-  const message = error.message.replace("Firebase: ", "");
-  if (message.includes("auth/requires-recent-login"))
-    return "Please re-enter your password to confirm this security change.";
-  if (message.includes("auth/invalid-verification-code") || message.includes("totp"))
-    return "That code didn't match. Check your authenticator app and try again.";
-  if (message.includes("auth/operation-not-allowed"))
-    return "TOTP two-factor auth isn't enabled for this project yet (enable it in the Firebase console).";
-  return message.replace(/\(auth.*\)\.?/, "").trim() || "Something went wrong.";
-}
+// Generic, non-leaky fallback shown when two-factor setup can't proceed
+// (e.g. the provider isn't configured). The real reason is logged server-side.
+const MFA_UNAVAILABLE = "Two-factor setup isn't available right now. Please try again later.";
 
 export function ProfileClient() {
   const { user } = useAuth();
@@ -100,7 +94,8 @@ export function ProfileClient() {
       await apiFetch("/api/me", { method: "POST" }).catch(() => undefined);
       setMessage({ type: "success", text: "Profile updated." });
     } catch (error) {
-      setMessage({ type: "error", text: friendlyError(error) });
+      reportUnexpectedError("profile-save", error);
+      setMessage({ type: "error", text: friendlyAuthError(error, "Couldn't save your profile. Please try again.") });
     } finally {
       setBusy("");
     }
@@ -119,7 +114,8 @@ export function ProfileClient() {
       setNewPassword("");
       setMessage({ type: "success", text: "Password changed." });
     } catch (error) {
-      setMessage({ type: "error", text: friendlyError(error) });
+      reportUnexpectedError("password-change", error);
+      setMessage({ type: "error", text: friendlyAuthError(error) });
     } finally {
       setBusy("");
     }
@@ -141,7 +137,8 @@ export function ProfileClient() {
       setTotpSecret(secret);
       setQrDataUrl(dataUrl);
     } catch (error) {
-      setMessage({ type: "error", text: friendlyError(error) });
+      reportUnexpectedError("mfa-begin", error);
+      setMessage({ type: "error", text: friendlyAuthError(error, MFA_UNAVAILABLE) });
     } finally {
       setBusy("");
     }
@@ -162,7 +159,8 @@ export function ProfileClient() {
       setConfirmPassword("");
       setMessage({ type: "success", text: "Authenticator app enabled. You'll be asked for a code at next sign-in." });
     } catch (error) {
-      setMessage({ type: "error", text: friendlyError(error) });
+      reportUnexpectedError("mfa-enroll", error);
+      setMessage({ type: "error", text: friendlyAuthError(error, MFA_UNAVAILABLE) });
     } finally {
       setBusy("");
     }
@@ -179,7 +177,8 @@ export function ProfileClient() {
       refreshFactors();
       setMessage({ type: "success", text: "Two-factor method removed." });
     } catch (error) {
-      setMessage({ type: "error", text: friendlyError(error) });
+      reportUnexpectedError("mfa-remove", error);
+      setMessage({ type: "error", text: friendlyAuthError(error, MFA_UNAVAILABLE) });
     } finally {
       setBusy("");
     }
@@ -221,9 +220,48 @@ export function ProfileClient() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6">
-      <header>
-        <h1 className="font-display text-3xl font-extrabold text-ink">Your profile</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">Manage your account, security, and personal data.</p>
+      {/* Account hero — same branded surface as the Dashboard: onyx base + aurora overlay */}
+      <header className="relative overflow-hidden rounded-3xl border border-white/5 bg-onyx p-6 text-white sm:p-8">
+        <div className="brand-aurora pointer-events-none absolute inset-0 opacity-90" />
+        <div className="relative flex flex-col gap-5">
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-brand ring-1 ring-white/10">
+            Your profile
+          </span>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            {user?.photoURL ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.photoURL} alt="" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white/15" />
+            ) : (
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-brand-gradient text-xl font-bold text-white ring-2 ring-white/15">
+                {initials}
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="font-display text-2xl font-extrabold tracking-tight">{user?.displayName || "Your account"}</p>
+              <p className="flex items-center gap-1.5 text-sm text-white/70">
+                <Mail className="h-3.5 w-3.5" />
+                {user?.email}
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                {providerIds.map((id) => (
+                  <span
+                    key={id}
+                    className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/10"
+                  >
+                    {providerLabels[id] ?? id}
+                  </span>
+                ))}
+                {factors.length > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-400/20">
+                    <ShieldCheck className="h-3 w-3" />
+                    2FA on
+                  </span>
+                )}
+                {memberSince && <span className="text-xs text-white/45">Member since {memberSince}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
       {message && (
@@ -238,38 +276,6 @@ export function ProfileClient() {
           {message.text}
         </div>
       )}
-
-      {/* Account hero */}
-      <Card className="overflow-hidden p-0">
-        <div className="relative brand-aurora bg-onyx p-6 sm:p-7">
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
-            {user?.photoURL ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.photoURL} alt="" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white/15" />
-            ) : (
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-brand-gradient text-xl font-bold text-white ring-2 ring-white/15">
-                {initials}
-              </span>
-            )}
-            <div className="min-w-0">
-              <p className="font-display text-xl font-bold text-white">{user?.displayName || "Your account"}</p>
-              <p className="flex items-center gap-1.5 text-sm text-white/70">
-                <Mail className="h-3.5 w-3.5" />
-                {user?.email}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {providerIds.map((id) => (
-                  <Badge key={id} tone="brand">
-                    {providerLabels[id] ?? id}
-                  </Badge>
-                ))}
-                {factors.length > 0 && <Badge tone="success">2FA on</Badge>}
-                {memberSince && <span className="text-xs text-white/50">Member since {memberSince}</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Profile edit */}

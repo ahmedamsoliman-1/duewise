@@ -106,8 +106,13 @@ textarea {
 }
 
 /* Ambient warm glow used behind hero / auth surfaces */
+/*
+  Warm glow layer. Uses background-image (not the `background` shorthand) so it
+  can be layered on top of a `bg-onyx` base on the SAME element without wiping
+  the base color. Safe both as an overlay div and directly on a colored surface.
+*/
 .brand-aurora {
-  background:
+  background-image:
     radial-gradient(60% 55% at 15% 0%, rgb(var(--color-brand) / 0.22), transparent 60%),
     radial-gradient(50% 50% at 100% 20%, rgb(var(--color-flame) / 0.18), transparent 55%),
     radial-gradient(70% 60% at 80% 100%, rgb(var(--color-brand-strong) / 0.14), transparent 60%);
