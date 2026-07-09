@@ -20,9 +20,7 @@ import {
   format,
   getMonth,
   getYear,
-  isAfter,
   isBefore,
-  isSameMonth,
   isWithinInterval,
   parseISO,
   startOfMonth,
@@ -181,14 +179,13 @@ export function TimelineClient() {
   }, [cursor, visibleEvents]);
 
   const monthWindow = useMemo(() => {
-    const monthStart = startOfMonth(cursor);
     const max = Math.max(visibleEvents.length - 1, 1);
     return visibleEvents.map((event, index) => ({
       event,
       left: `${Math.max(3, Math.min(94, (index / max) * 92 + 4))}%`,
       above: index % 2 === 0
     }));
-  }, [cursor, visibleEvents]);
+  }, [visibleEvents]);
 
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
