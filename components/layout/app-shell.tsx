@@ -41,7 +41,7 @@ const navItems: NavItem[] = [
   { href: "/inventory", label: "Inventory", icon: Boxes },
   { href: "/family", label: "Family", icon: Users },
   { href: "/life-events", label: "Life Events", icon: Milestone, primary: true },
-  { href: "/timeline", label: "Timeline", icon: Waypoints, primary: true },
+  { href: "/timeline", label: "Timeline", icon: Waypoints },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 

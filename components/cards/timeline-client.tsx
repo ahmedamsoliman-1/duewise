@@ -38,7 +38,7 @@ import { Skeleton } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api/client";
 import type { TimelineEvent } from "@/types";
 
-type ViewMode = "year" | "month" | "agenda";
+type ViewMode = "years" | "year" | "month" | "agenda";
 type SourceFilter = TimelineEvent["source"] | "all";
 
 const icons = {
@@ -59,6 +59,7 @@ const sourceLabels: Record<SourceFilter, string> = {
 };
 
 const monthLabels = Array.from({ length: 12 }, (_, index) => format(new Date(2026, index, 1), "MMM"));
+const yearWindowRadius = 7;
 
 function eventTime(event: TimelineEvent) {
   return parseISO(event.date).getTime();
@@ -121,7 +122,7 @@ export function TimelineClient() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<ViewMode>("year");
+  const [mode, setMode] = useState<ViewMode>("years");
   const [cursor, setCursor] = useState(new Date());
   const [source, setSource] = useState<SourceFilter>("all");
   const [query, setQuery] = useState("");
@@ -148,12 +149,20 @@ export function TimelineClient() {
   const period = useMemo(() => {
     if (mode === "month") return { start: startOfMonth(cursor), end: endOfMonth(cursor), label: format(cursor, "MMMM yyyy") };
     if (mode === "year") return { start: startOfYear(cursor), end: endOfYear(cursor), label: format(cursor, "yyyy") };
+    if (mode === "years") {
+      const center = getYear(cursor);
+      return {
+        start: startOfYear(new Date(center - yearWindowRadius, 0, 1)),
+        end: endOfYear(new Date(center + yearWindowRadius, 0, 1)),
+        label: `${center - yearWindowRadius}–${center + yearWindowRadius}`
+      };
+    }
     return { start: new Date(1900, 0, 1), end: new Date(2200, 11, 31), label: "Agenda" };
   }, [cursor, mode]);
 
   const visibleEvents = useMemo(() => {
     return filtered
-      .filter((event) => mode === "agenda" || eventMatchesPeriod(event, period.start, period.end))
+      .filter((event) => mode === "agenda" || mode === "years" || eventMatchesPeriod(event, period.start, period.end))
       .sort((a, b) => eventTime(a) - eventTime(b));
   }, [filtered, mode, period.end, period.start]);
 
@@ -163,12 +172,43 @@ export function TimelineClient() {
   );
 
   function previous() {
-    setCursor((current) => (mode === "month" ? subMonths(current, 1) : subYears(current, 1)));
+    setCursor((current) => (mode === "month" ? subMonths(current, 1) : subYears(current, mode === "years" ? 10 : 1)));
   }
 
   function next() {
-    setCursor((current) => (mode === "month" ? addMonths(current, 1) : addYears(current, 1)));
+    setCursor((current) => (mode === "month" ? addMonths(current, 1) : addYears(current, mode === "years" ? 10 : 1)));
   }
+
+  function jumpToYear(year: number) {
+    setCursor((current) => new Date(year, getMonth(current), 1));
+    setMode("year");
+  }
+
+  function zoomOut() {
+    if (mode === "month") setMode("year");
+    else if (mode === "year") setMode("years");
+    else if (mode === "agenda") setMode("years");
+  }
+
+  const yearOptions = useMemo(() => {
+    const activeYear = getYear(cursor);
+    return Array.from({ length: yearWindowRadius * 2 + 1 }, (_, index) => {
+      const year = activeYear - yearWindowRadius + index;
+      const count = filtered.filter((event) => getYear(parseISO(event.date)) === year).length;
+      return { year, count };
+    });
+  }, [cursor, filtered]);
+
+  const eventYears = useMemo(() => {
+    const counts = new Map<number, number>();
+    filtered.forEach((event) => {
+      const year = getYear(parseISO(event.date));
+      counts.set(year, (counts.get(year) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .map(([year, count]) => ({ year, count }))
+      .sort((a, b) => a.year - b.year);
+  }, [filtered]);
 
   const yearBuckets = useMemo(() => {
     const year = getYear(cursor);
@@ -196,17 +236,17 @@ export function TimelineClient() {
             Browse admin deadlines and major human milestones together, with zoomable year, month, and agenda views.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {(["year", "month", "agenda"] as ViewMode[]).map((item) => (
+        <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          {(["years", "year", "month", "agenda"] as ViewMode[]).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setMode(item)}
-              className={`h-10 rounded-xl px-4 text-sm font-semibold capitalize transition-colors ${
+              className={`h-10 rounded-xl px-3 text-sm font-semibold capitalize transition-colors sm:px-4 ${
                 mode === item ? "bg-brand text-white" : "border border-line bg-surface text-ink/70 hover:text-ink"
               }`}
             >
-              {item}
+              {item === "years" ? "Years" : item}
             </button>
           ))}
         </div>
@@ -214,7 +254,7 @@ export function TimelineClient() {
 
       <Card>
         <div className="grid gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-          <div className="flex items-center gap-2">
+          <div className="order-2 flex items-center justify-center gap-2 lg:order-1 lg:justify-start">
             {mode !== "agenda" && (
               <>
                 <Button variant="secondary" size="icon" onClick={previous} title="Previous period">
@@ -225,15 +265,20 @@ export function TimelineClient() {
                 </Button>
               </>
             )}
+            {mode !== "years" && (
+              <Button variant="secondary" onClick={zoomOut}>
+                Zoom out
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setCursor(new Date())}>
               Today
             </Button>
           </div>
-          <div className="text-center">
-            <p className="font-display text-2xl font-bold text-ink">{period.label}</p>
+          <div className="order-1 text-center lg:order-2">
+            <p className="font-display text-2xl font-bold leading-tight text-ink">{period.label}</p>
             <p className="text-sm text-muted">{visibleEvents.length} visible events</p>
           </div>
-          <div className="relative">
+          <div className="relative order-3">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input className="pl-10" placeholder="Search timeline" value={query} onChange={(event) => setQuery(event.target.value)} />
           </div>
@@ -252,6 +297,26 @@ export function TimelineClient() {
             </button>
           ))}
         </div>
+        {mode === "agenda" && eventYears.length > 0 ? (
+          <div className="mt-4 rounded-2xl border border-line bg-panel/35 p-2">
+            <div className="mb-2 px-1 text-center text-xs font-bold uppercase tracking-wide text-muted">Years with events</div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {eventYears.map((item) => (
+                <button
+                  key={item.year}
+                  type="button"
+                  onClick={() => jumpToYear(item.year)}
+                  className="grid min-w-20 shrink-0 place-items-center rounded-xl border border-line bg-surface px-3 py-2 text-ink/75 transition-colors hover:border-brand/30 hover:text-ink"
+                >
+                  <span className="text-sm font-extrabold">{item.year}</span>
+                  <span className="text-[11px] font-semibold text-muted">
+                    {item.count} event{item.count === 1 ? "" : "s"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {loading ? (
@@ -278,9 +343,44 @@ export function TimelineClient() {
         </Card>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-          <Card className="min-w-0">
+          <Card className="min-w-0 p-3 sm:p-6">
+            {mode === "years" && (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+                {yearOptions.map((item) => {
+                  const active = getYear(cursor) === item.year;
+                  const yearEvents = filtered
+                    .filter((event) => getYear(parseISO(event.date)) === item.year)
+                    .sort((a, b) => eventTime(a) - eventTime(b));
+                  return (
+                    <button
+                      key={item.year}
+                      type="button"
+                      onClick={() => jumpToYear(item.year)}
+                      className={`min-h-36 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-soft ${
+                        active ? "border-brand/45 bg-brand-soft" : "border-line bg-panel/35 hover:border-brand/30 hover:bg-brand-soft/25"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="font-display text-2xl font-extrabold text-ink">{item.year}</span>
+                        <Badge tone={item.count ? "brand" : "neutral"}>{item.count}</Badge>
+                      </span>
+                      <span className="mt-5 flex min-h-8 flex-wrap gap-1.5">
+                        {yearEvents.slice(0, 10).map((event) => (
+                          <span key={event.id} className={`h-2.5 w-2.5 rounded-full ${sourceDot(event.source)}`} title={event.title} />
+                        ))}
+                      </span>
+                      {yearEvents[0] ? (
+                        <span className="mt-4 block truncate text-sm font-semibold text-ink/75">{yearEvents[0].title}</span>
+                      ) : (
+                        <span className="mt-4 block text-sm font-medium text-muted">No records yet</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {mode === "year" && (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-3">
                 {yearBuckets.map((bucket) => (
                   <button
                     key={bucket.label}
@@ -289,18 +389,22 @@ export function TimelineClient() {
                       setMode("month");
                       setCursor(new Date(getYear(cursor), bucket.index, 1));
                     }}
-                    className="min-h-32 rounded-2xl border border-line bg-panel/35 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand-soft/30"
+                    className="min-h-24 rounded-2xl border border-line bg-panel/35 p-3 text-left transition-colors hover:border-brand/30 hover:bg-brand-soft/30 sm:min-h-32 sm:p-4"
                   >
                     <span className="flex items-center justify-between gap-3">
-                      <span className="font-display text-lg font-bold text-ink">{bucket.label}</span>
+                      <span className="font-display text-base font-bold text-ink sm:text-lg">{bucket.label}</span>
                       <Badge tone={bucket.events.length ? "brand" : "neutral"}>{bucket.events.length}</Badge>
                     </span>
-                    <span className="mt-4 flex min-h-8 flex-wrap gap-1.5">
-                      {bucket.events.slice(0, 8).map((event) => (
+                    <span className="mt-3 flex min-h-7 flex-wrap gap-1.5 sm:mt-4 sm:min-h-8">
+                      {bucket.events.slice(0, 6).map((event) => (
                         <span key={event.id} className={`h-2.5 w-2.5 rounded-full ${sourceDot(event.source)}`} title={event.title} />
                       ))}
                     </span>
-                    {bucket.events[0] && <span className="mt-3 block truncate text-sm font-medium text-ink/70">{bucket.events[0].title}</span>}
+                    {bucket.events[0] && (
+                      <span className="mt-2 block truncate text-xs font-medium text-ink/70 sm:mt-3 sm:text-sm">
+                        {bucket.events[0].title}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -346,7 +450,13 @@ export function TimelineClient() {
             )}
 
             {mode === "agenda" && (
-              <ol className="relative grid gap-2">
+              <>
+              <div className="grid gap-3 md:hidden">
+                {visibleEvents.map((event) => (
+                  <EventCard key={event.id} event={event} selected={selectedEvent?.id === event.id} onSelect={() => setSelectedId(event.id)} />
+                ))}
+              </div>
+              <ol className="relative hidden gap-2 md:grid">
                 <span className="absolute bottom-4 left-[27px] top-4 w-px bg-line" aria-hidden="true" />
                 {visibleEvents.map((event) => {
                   const Icon = icons[event.source];
@@ -375,6 +485,7 @@ export function TimelineClient() {
                   );
                 })}
               </ol>
+              </>
             )}
           </Card>
 
