@@ -52,6 +52,23 @@ function initialsFor(name?: string | null, email?: string | null) {
   return letters.toUpperCase();
 }
 
+function Avatar({ url, initials, className }: { url?: string | null; initials: string; className?: string }) {
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className={cn("h-9 w-9 shrink-0 rounded-lg object-cover", className)} />;
+  }
+  return (
+    <span
+      className={cn(
+        "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-gradient text-sm font-bold text-white",
+        className
+      )}
+    >
+      {initials}
+    </span>
+  );
+}
+
 function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
   const Icon = item.icon;
   return (
@@ -75,7 +92,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isPublic = pathname === "/login" || pathname === "/signup";
+  const isPublic =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/");
 
   useEffect(() => {
     setMenuOpen(false);
@@ -119,14 +140,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <MoonStar className="h-[18px] w-[18px]" />}
               {theme === "dark" ? "Light mode" : "Dark mode"}
             </button>
-            <div className="mt-2 flex items-center gap-3 rounded-xl border border-line bg-panel/60 p-2.5">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-gradient text-sm font-bold text-white">
-                {initials}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-ink">{user.displayName || "Your account"}</p>
-                <p className="truncate text-xs text-muted">{user.email}</p>
-              </div>
+            <div
+              className={cn(
+                "mt-2 flex items-center gap-2 rounded-xl border border-line bg-panel/60 p-2 transition-colors",
+                isActive("/profile") && "border-brand/30 bg-brand-soft"
+              )}
+            >
+              <Link
+                href="/profile"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-0.5 hover:opacity-90"
+                title="Your profile"
+              >
+                <Avatar url={user.photoURL} initials={initials} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink">{user.displayName || "Your account"}</span>
+                  <span className="block truncate text-xs text-muted">{user.email}</span>
+                </span>
+              </Link>
               <button
                 type="button"
                 onClick={() => signOut(auth)}
@@ -197,19 +227,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-0 animate-fade bg-black/50 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 animate-rise rounded-t-3xl border-t border-line bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
             <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-gradient text-sm font-bold text-white">
-                  {initials}
-                </span>
+              <Link href="/profile" className="flex min-w-0 items-center gap-3" onClick={() => setMenuOpen(false)}>
+                <Avatar url={user.photoURL} initials={initials} className="h-10 w-10 rounded-xl" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{user.displayName || "Your account"}</p>
-                  <p className="truncate text-xs text-muted">{user.email}</p>
+                  <p className="truncate text-xs text-muted">{user.email} · View profile</p>
                 </div>
-              </div>
+              </Link>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                className="grid h-9 w-9 place-items-center rounded-lg text-ink/60 hover:bg-ink/[0.06]"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink/60 hover:bg-ink/[0.06]"
                 aria-label="Close menu"
               >
                 <X className="h-5 w-5" />
