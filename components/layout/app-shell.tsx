@@ -5,94 +5,250 @@ import {
   CalendarClock,
   CreditCard,
   FileText,
-  Home,
   LayoutDashboard,
   LogOut,
+  MoonStar,
+  MoreHorizontal,
   Settings,
-  SunMoon,
-  Users
+  Sun,
+  Users,
+  Waypoints,
+  X
 } from "lucide-react";
 import { signOut } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase/client";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useTheme } from "@/components/layout/theme-provider";
-import { DuewiseLogo } from "@/components/ui/duewise-logo";
+import { DuewiseLogo, DuewiseMark } from "@/components/ui/duewise-logo";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/tasks", label: "Tasks", icon: CalendarClock },
-  { href: "/documents", label: "Documents", icon: FileText },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  primary?: boolean;
+};
+
+const navItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, primary: true },
+  { href: "/tasks", label: "Tasks", icon: CalendarClock, primary: true },
+  { href: "/documents", label: "Documents", icon: FileText, primary: true },
   { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
   { href: "/inventory", label: "Inventory", icon: Boxes },
   { href: "/family", label: "Family", icon: Users },
-  { href: "/timeline", label: "Timeline", icon: Home },
+  { href: "/timeline", label: "Timeline", icon: Waypoints, primary: true },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
+
+const primaryItems = navItems.filter((item) => item.primary);
+
+function initialsFor(name?: string | null, email?: string | null) {
+  const source = name?.trim() || email?.split("@")[0] || "";
+  const parts = source.split(/[\s._-]+/).filter(Boolean);
+  const letters = (parts[0]?.[0] ?? "D") + (parts[1]?.[0] ?? "");
+  return letters.toUpperCase();
+}
+
+function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={cn(
+        "group relative flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
+        active ? "bg-brand-soft text-brand-strong" : "text-ink/65 hover:bg-ink/[0.05] hover:text-ink"
+      )}
+    >
+      {active && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand" />}
+      <Icon className={cn("h-[18px] w-[18px]", active ? "text-brand" : "text-ink/50 group-hover:text-ink")} />
+      {item.label}
+    </Link>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { loading, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
   const isPublic = pathname === "/login" || pathname === "/signup";
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   if (isPublic) return <>{children}</>;
 
   if (loading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-mist text-sm text-ink/60">
-        Checking your secure workspace...
+      <main className="grid min-h-screen place-items-center bg-bg">
+        <div className="flex flex-col items-center gap-4">
+          <DuewiseMark className="h-12 w-12 animate-pulse" />
+          <p className="text-sm text-muted">Opening your workspace…</p>
+        </div>
       </main>
     );
   }
 
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const initials = initialsFor(user.displayName, user.email);
+
   return (
-    <div className="min-h-screen bg-mist lg:flex">
-      <aside className="border-b border-ink/10 bg-white lg:fixed lg:inset-y-0 lg:w-72 lg:border-b-0 lg:border-r dark:bg-[#111817]">
+    <div className="min-h-screen bg-bg lg:flex">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col lg:border-r lg:border-line lg:bg-surface">
         <div className="flex h-full flex-col p-4">
-          <Link href="/dashboard" className="mb-5 flex items-center gap-3 rounded-md px-2 py-3">
+          <Link href="/dashboard" className="mb-6 flex items-center rounded-xl px-2 py-2">
             <DuewiseLogo />
           </Link>
-          <nav className="grid gap-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink/70 transition hover:bg-mist hover:text-ink",
-                    active && "bg-skyglass text-ink"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
+          <nav className="flex flex-1 flex-col gap-1">
+            {navItems.map((item) => (
+              <NavLink key={item.href} item={item} active={isActive(item.href)} />
+            ))}
           </nav>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="mt-6 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink/60 transition hover:bg-mist hover:text-ink lg:mt-auto"
-          >
-            <SunMoon className="h-4 w-4" />
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </button>
-          <button
-            type="button"
-            onClick={() => signOut(auth)}
-            className="mt-1 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink/60 transition hover:bg-mist hover:text-ink"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
+          <div className="mt-4 border-t border-line pt-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink/65 transition-colors hover:bg-ink/[0.05] hover:text-ink"
+            >
+              {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <MoonStar className="h-[18px] w-[18px]" />}
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
+            <div className="mt-2 flex items-center gap-3 rounded-xl border border-line bg-panel/60 p-2.5">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-gradient text-sm font-bold text-white">
+                {initials}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-ink">{user.displayName || "Your account"}</p>
+                <p className="truncate text-xs text-muted">{user.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => signOut(auth)}
+                title="Sign out"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink/55 transition-colors hover:bg-ink/[0.06] hover:text-ink"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
-      <main className="min-h-screen px-4 py-5 sm:px-6 lg:ml-72 lg:px-8">{children}</main>
+
+      {/* Mobile top bar */}
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line bg-bg/85 px-4 backdrop-blur-lg lg:hidden">
+        <Link href="/dashboard" className="flex items-center">
+          <DuewiseLogo showTagline={false} />
+        </Link>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-surface text-ink/70 transition-colors hover:text-ink"
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <MoonStar className="h-[18px] w-[18px]" />}
+        </button>
+      </header>
+
+      {/* Main content */}
+      <main className="min-h-screen px-4 pb-28 pt-5 sm:px-6 lg:ml-72 lg:px-10 lg:pb-12 lg:pt-9">
+        <div className="animate-rise">{children}</div>
+      </main>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
+        <div className="mx-auto grid max-w-lg grid-cols-5">
+          {primaryItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
+                  active ? "text-brand-strong" : "text-ink/55"
+                )}
+              >
+                <Icon className={cn("h-5 w-5", active && "text-brand")} />
+                {item.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            className="flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-ink/55"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            More
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile "More" sheet */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 animate-fade bg-black/50 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 animate-rise rounded-t-3xl border-t border-line bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-gradient text-sm font-bold text-white">
+                  {initials}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{user.displayName || "Your account"}</p>
+                  <p className="truncate text-xs text-muted">{user.email}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-lg text-ink/60 hover:bg-ink/[0.06]"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {navItems
+                .filter((item) => !item.primary)
+                .map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl border p-3 text-sm font-medium transition-colors",
+                        active
+                          ? "border-brand/30 bg-brand-soft text-brand-strong"
+                          : "border-line bg-panel/50 text-ink/75 hover:text-ink"
+                      )}
+                    >
+                      <Icon className="h-[18px] w-[18px]" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+            </div>
+            <button
+              type="button"
+              onClick={() => signOut(auth)}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-panel/50 p-3 text-sm font-semibold text-ink/75 hover:text-ink"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

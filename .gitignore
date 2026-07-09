@@ -7,3 +7,4 @@ firestore-debug.log
 storage-debug.log
 *.tsbuildinfo
 *git_sh
+.claude

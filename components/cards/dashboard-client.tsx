@@ -1,10 +1,12 @@
 "use client";
 
-import { AlertTriangle, CalendarDays, CreditCard, FileText, PackageCheck, Plus } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarDays, CreditCard, FileText, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api/client";
 import type { DuewiseDocument, Subscription, Task, TimelineEvent } from "@/types";
 
@@ -18,6 +20,13 @@ type DashboardData = {
   counts: Record<string, number>;
 };
 
+const quickAdds = [
+  ["/tasks", "Task"],
+  ["/documents", "Document"],
+  ["/subscriptions", "Subscription"],
+  ["/inventory", "Inventory"]
+] as const;
+
 export function DashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
@@ -28,99 +37,197 @@ export function DashboardClient() {
       .catch((nextError) => setError(nextError instanceof Error ? nextError.message : "Could not load dashboard."));
   }, []);
 
-  if (error) return <p className="rounded-md bg-red-50 p-4 text-sm text-red-700">{error}</p>;
-  if (!data) return <p className="text-sm text-ink/60">Preparing your dashboard...</p>;
+  if (error)
+    return (
+      <p className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm font-medium text-red-600 dark:text-red-300">
+        {error}
+      </p>
+    );
 
-  const stats = [
-    { label: "Upcoming", value: data.upcomingDeadlines.length, icon: CalendarDays },
-    { label: "Overdue", value: data.overdueTasks.length, icon: AlertTriangle },
-    { label: "Expiring docs", value: data.documentsExpiringSoon.length, icon: FileText },
-    { label: "Monthly spend", value: `$${data.monthlySpend.toFixed(0)}`, icon: CreditCard }
-  ];
+  const stats = data
+    ? [
+        { label: "Upcoming", value: data.upcomingDeadlines.length, icon: CalendarDays, tone: "brand" as const },
+        { label: "Overdue", value: data.overdueTasks.length, icon: AlertTriangle, tone: "danger" as const },
+        { label: "Expiring docs", value: data.documentsExpiringSoon.length, icon: FileText, tone: "warning" as const },
+        { label: "Monthly spend", value: `$${data.monthlySpend.toFixed(0)}`, icon: CreditCard, tone: "success" as const }
+      ]
+    : [];
+
+  const toneClass: Record<string, string> = {
+    brand: "bg-brand-soft text-brand",
+    danger: "bg-red-500/12 text-red-600 dark:text-red-300",
+    warning: "bg-amber-500/14 text-amber-600 dark:text-amber-300",
+    success: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300"
+  };
 
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-ink">Dashboard</h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink/60">Your calm command center for documents, deadlines, renewals, warranties, and household admin.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            ["/tasks", "Task"],
-            ["/documents", "Document"],
-            ["/subscriptions", "Subscription"],
-            ["/inventory", "Inventory"]
-          ].map(([href, label]) => (
-            <Link key={href} href={href}>
-              <Button variant="secondary">
-                <Plus className="h-4 w-4" />
-                {label}
-              </Button>
-            </Link>
-          ))}
+      {/* Hero header */}
+      <header className="relative overflow-hidden rounded-3xl border border-white/5 bg-onyx p-6 text-white sm:p-8">
+        <div className="brand-aurora pointer-events-none absolute inset-0 opacity-90" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-brand ring-1 ring-white/10">
+              <Sparkles className="h-3.5 w-3.5" />
+              Command center
+            </span>
+            <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Dashboard</h1>
+            <p className="mt-2 max-w-xl text-sm text-white/65">
+              Everything that&apos;s due — documents, deadlines, renewals, warranties, and household admin, handled early.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {quickAdds.map(([href, label]) => (
+              <Link key={href} href={href}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="border-white/15 bg-white/10 text-white backdrop-blur hover:bg-white/20"
+                >
+                  <Plus className="h-4 w-4" />
+                  {label}
+                </Button>
+              </Link>
+            ))}
+          </div>
         </div>
       </header>
 
+      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-ink/55">{stat.label}</p>
-                <Icon className="h-5 w-5 text-sage" />
-              </div>
-              <p className="mt-3 text-3xl font-semibold">{stat.value}</p>
-            </Card>
-          );
-        })}
+        {data
+          ? stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <Card key={stat.label} className="p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted">{stat.label}</p>
+                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${toneClass[stat.tone]}`}>
+                      <Icon className="h-[18px] w-[18px]" />
+                    </span>
+                  </div>
+                  <p className="mt-3 font-display text-3xl font-extrabold text-ink">{stat.value}</p>
+                </Card>
+              );
+            })
+          : Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index} className="p-5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="mt-4 h-8 w-16" />
+              </Card>
+            ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+        {/* Upcoming */}
         <Card>
-          <h2 className="mb-4 text-lg font-semibold">Upcoming life admin</h2>
-          {data.upcomingDeadlines.length ? (
-            <div className="grid gap-3">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold text-ink">Upcoming life admin</h2>
+            <Link href="/timeline" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-strong hover:underline">
+              Timeline <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+          {!data ? (
+            <div className="grid gap-2.5">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : data.upcomingDeadlines.length ? (
+            <div className="grid gap-2.5">
               {data.upcomingDeadlines.map((event) => (
-                <Link key={event.id} href={event.href} className="flex items-center justify-between rounded-md border border-ink/10 p-3 transition hover:bg-mist">
-                  <span>
-                    <span className="block font-medium">{event.title}</span>
-                    <span className="text-sm text-ink/55">{event.label}</span>
+                <Link
+                  key={event.id}
+                  href={event.href}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-line p-3.5 transition-colors hover:border-brand/30 hover:bg-brand-soft/40"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-ink">{event.title}</span>
+                    <span className="text-sm text-muted">{event.label}</span>
                   </span>
-                  <span className="text-sm font-medium text-sage">{event.date}</span>
+                  <Badge tone="brand">{event.date}</Badge>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-ink/60">Nothing urgent yet. Add a few tasks, documents, subscriptions, or inventory items to populate your command center.</p>
+            <EmptyHint
+              title="Nothing urgent yet"
+              body="Add a few tasks, documents, subscriptions, or inventory items to populate your command center."
+            />
           )}
         </Card>
+
+        {/* Snapshot */}
         <Card>
-          <h2 className="mb-4 text-lg font-semibold">System health</h2>
-          <div className="grid gap-3 text-sm">
-            <p className="flex items-center justify-between"><span>Tasks</span><strong>{data.counts.tasks}</strong></p>
-            <p className="flex items-center justify-between"><span>Documents</span><strong>{data.counts.documents}</strong></p>
-            <p className="flex items-center justify-between"><span>Subscriptions</span><strong>{data.counts.subscriptions}</strong></p>
-            <p className="flex items-center justify-between"><span>Inventory items</span><strong>{data.counts.inventory}</strong></p>
+          <h2 className="mb-4 font-display text-lg font-bold text-ink">Snapshot</h2>
+          <div className="grid gap-2.5 text-sm">
+            {[
+              ["Tasks", data?.counts.tasks],
+              ["Documents", data?.counts.documents],
+              ["Subscriptions", data?.counts.subscriptions],
+              ["Inventory items", data?.counts.inventory]
+            ].map(([label, value]) => (
+              <div key={label as string} className="flex items-center justify-between rounded-xl bg-panel/50 px-3.5 py-2.5">
+                <span className="text-muted">{label}</span>
+                <strong className="font-display text-ink">{value ?? "—"}</strong>
+              </div>
+            ))}
           </div>
-          <div className="mt-5 rounded-md bg-skyglass/45 p-4">
-            <PackageCheck className="mb-2 h-5 w-5 text-sage" />
-            <p className="text-sm text-ink/70">Reminder dates are stored with tasks and surfaced through dashboard and timeline aggregation.</p>
+          <div className="mt-5 rounded-xl bg-brand-soft/60 p-4">
+            <p className="text-sm text-ink/75">
+              Reminder dates are stored with tasks and surfaced through dashboard and timeline aggregation.
+            </p>
           </div>
         </Card>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
-          <h2 className="mb-4 text-lg font-semibold">Documents expiring soon</h2>
-          {data.documentsExpiringSoon.length ? data.documentsExpiringSoon.map((doc) => <p key={doc.id} className="border-t border-ink/10 py-3 text-sm">{doc.title} · {doc.expiryDate}</p>) : <p className="text-sm text-ink/60">No document expiries in the next 60 days.</p>}
+          <h2 className="mb-4 font-display text-lg font-bold text-ink">Documents expiring soon</h2>
+          {!data ? (
+            <Skeleton className="h-24 w-full rounded-xl" />
+          ) : data.documentsExpiringSoon.length ? (
+            <ul className="grid gap-1">
+              {data.documentsExpiringSoon.map((doc) => (
+                <li key={doc.id} className="flex items-center justify-between border-t border-line py-3 text-sm first:border-t-0">
+                  <span className="font-medium text-ink">{doc.title}</span>
+                  <Badge tone="warning">{doc.expiryDate}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyHint title="All clear" body="No document expiries in the next 60 days." />
+          )}
         </Card>
         <Card>
-          <h2 className="mb-4 text-lg font-semibold">Renewals this month</h2>
-          {data.renewalsThisMonth.length ? data.renewalsThisMonth.map((sub) => <p key={sub.id} className="border-t border-ink/10 py-3 text-sm">{sub.name} · {sub.currency} {sub.cost}</p>) : <p className="text-sm text-ink/60">No subscription renewals this month.</p>}
+          <h2 className="mb-4 font-display text-lg font-bold text-ink">Renewals this month</h2>
+          {!data ? (
+            <Skeleton className="h-24 w-full rounded-xl" />
+          ) : data.renewalsThisMonth.length ? (
+            <ul className="grid gap-1">
+              {data.renewalsThisMonth.map((sub) => (
+                <li key={sub.id} className="flex items-center justify-between border-t border-line py-3 text-sm first:border-t-0">
+                  <span className="font-medium text-ink">{sub.name}</span>
+                  <Badge tone="brand">
+                    {sub.currency} {sub.cost}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyHint title="Nothing due" body="No subscription renewals this month." />
+          )}
         </Card>
       </div>
+    </div>
+  );
+}
+
+function EmptyHint({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-line bg-panel/30 p-5 text-center">
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-sm text-muted">{body}</p>
     </div>
   );
 }

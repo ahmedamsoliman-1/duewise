@@ -2,20 +2,22 @@ import { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } fro
 import { cn } from "@/lib/utils";
 
 const fieldClass =
-  "h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-sage focus:ring-2 focus:ring-sage/15 dark:bg-[#0c1110]";
+  "w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60";
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn(fieldClass, props.className)} />;
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={cn(fieldClass, "h-11", className)} />;
 }
 
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn(fieldClass, props.className)} />;
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={cn(fieldClass, "h-11 pr-8", className)} />;
 }
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn(fieldClass, "min-h-24 py-2", props.className)} />;
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={cn(fieldClass, "min-h-24 py-2.5", className)} />;
 }
 
-export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="space-y-1.5 text-sm font-medium text-ink/80">{children}</label>;
+export function Label({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <label className={cn("grid gap-1.5 text-sm font-medium text-ink/85", className)}>{children}</label>
+  );
 }
