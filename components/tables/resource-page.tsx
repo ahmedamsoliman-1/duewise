@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Download,
   Edit2,
   ExternalLink,
   FileText,
@@ -96,6 +97,18 @@ type SignedReadResponse = { data: { url: string } };
 
 const imageExtensions = new Set(["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"]);
 
+function fileExtension(storagePath: string) {
+  return storagePath.split("?")[0].split(".").pop()?.toLowerCase() ?? "";
+}
+
+function fileKind(storagePath: string) {
+  const extension = fileExtension(storagePath);
+  if (extension === "pdf") return { label: "PDF", tone: "bg-red-500/12 text-red-700 dark:text-red-300" };
+  if (["doc", "docx"].includes(extension)) return { label: "DOC", tone: "bg-blue-500/12 text-blue-700 dark:text-blue-300" };
+  if (["xls", "xlsx"].includes(extension)) return { label: "XLS", tone: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" };
+  return { label: extension ? extension.toUpperCase() : "FILE", tone: "bg-brand-soft text-brand-strong" };
+}
+
 function uploadErrorMessage(error: unknown) {
   if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
     return "Upload could not reach Google Cloud Storage. Check the bucket CORS settings for http://localhost:3000, then try again.";
@@ -104,7 +117,7 @@ function uploadErrorMessage(error: unknown) {
 }
 
 function isPreviewableImage(storagePath: string) {
-  const extension = storagePath.split("?")[0].split(".").pop()?.toLowerCase();
+  const extension = fileExtension(storagePath);
   return Boolean(extension && imageExtensions.has(extension));
 }
 
@@ -127,7 +140,9 @@ function renderCell(
   item: Record<string, unknown>,
   relationOptions: Record<string, Record<string, string>>,
   openStoredFile: (storagePath: unknown) => void,
+  downloadStoredFile: (storagePath: unknown) => void,
   openingPath: string,
+  downloadingPath: string,
   previewUrls: Record<string, string>
 ) {
   const raw = item[column.key];
@@ -156,6 +171,17 @@ function renderCell(
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {openingPath === raw ? "Opening" : "Open"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          disabled={downloadingPath === raw}
+          onClick={() => downloadStoredFile(raw)}
+          title="Download"
+        >
+          <Download className="h-3.5 w-3.5" />
         </Button>
       </div>
     );
@@ -342,7 +368,8 @@ function ResourceGridCards({
   openingPath,
   onEdit,
   onDelete,
-  onOpenFile
+  onOpenFile,
+  onDownloadFile
 }: {
   items: Record<string, unknown>[];
   columns: Column[];
@@ -352,6 +379,7 @@ function ResourceGridCards({
   onEdit: (item: Record<string, unknown>) => void;
   onDelete: (id: unknown) => void;
   onOpenFile: (storagePath: unknown) => void;
+  onDownloadFile: (storagePath: unknown) => void;
 }) {
   const titleColumn = columns[0];
   const detailColumns = columns.filter((column) => column.key !== titleColumn.key && column.key !== "storagePath");
@@ -361,6 +389,7 @@ function ResourceGridCards({
       {items.map((item) => {
         const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
         const previewUrl = storagePath ? previewUrls[storagePath] : "";
+        const kind = storagePath ? fileKind(storagePath) : undefined;
 
         return (
           <Card key={String(item.id)} className="overflow-hidden p-0">
@@ -372,9 +401,15 @@ function ResourceGridCards({
               {previewUrl ? (
                 <Image className="h-full w-full object-cover" src={previewUrl} alt="" fill sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 100vw" unoptimized />
               ) : (
-                <span className="grid h-full place-items-center bg-panel/80">
-                  <span className="grid h-16 w-16 place-items-center rounded-2xl bg-surface text-brand-strong shadow-sm ring-1 ring-line">
-                    <FileText className="h-8 w-8" />
+                <span className="grid h-full place-items-center bg-[radial-gradient(circle_at_top_left,rgba(246,139,31,0.16),transparent_32%),linear-gradient(135deg,var(--panel),var(--surface))] p-6">
+                  <span className="grid justify-items-center gap-3">
+                    <span className="relative grid h-20 w-16 place-items-center rounded-xl border border-line bg-surface text-brand-strong shadow-sm">
+                      <span className="absolute right-0 top-0 h-4 w-4 rounded-bl-lg border-b border-l border-line bg-panel" />
+                      <FileText className="h-8 w-8" />
+                    </span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-extrabold tracking-wide ${kind?.tone ?? "bg-brand-soft text-brand-strong"}`}>
+                      {kind?.label ?? "NO FILE"}
+                    </span>
                   </span>
                 </span>
               )}
@@ -421,10 +456,16 @@ function ResourceGridCards({
               </dl>
 
               {storagePath ? (
-                <Button type="button" variant="secondary" size="sm" onClick={() => onOpenFile(storagePath)}>
-                  <ExternalLink className="h-4 w-4" />
-                  {openingPath === storagePath ? "Opening" : "Open file"}
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => onOpenFile(storagePath)}>
+                    <ExternalLink className="h-4 w-4" />
+                    {openingPath === storagePath ? "Opening" : "Open"}
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => onDownloadFile(storagePath)}>
+                    <Download className="h-4 w-4" />
+                    Download
+                  </Button>
+                </div>
               ) : (
                 <Badge tone="neutral" className="w-fit">No file attached</Badge>
               )}
@@ -461,6 +502,7 @@ export function ResourcePage({
   const [relationOptions, setRelationOptions] = useState<Record<string, Record<string, string>>>({});
   const [uploadingField, setUploadingField] = useState("");
   const [openingPath, setOpeningPath] = useState("");
+  const [downloadingPath, setDownloadingPath] = useState("");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [listView, setListView] = useState<"grid" | "table">(preferredListView ?? "table");
   const [activeFilter, setActiveFilter] = useState("");
@@ -684,6 +726,29 @@ export function ResourcePage({
     }
   }
 
+  async function downloadStoredFile(storagePath: unknown) {
+    if (!storagePath || typeof storagePath !== "string") return;
+    setError("");
+    setDownloadingPath(storagePath);
+    try {
+      const response = await apiFetch<SignedReadResponse>("/api/storage/download-url", {
+        method: "POST",
+        body: JSON.stringify({ storagePath })
+      });
+      const link = document.createElement("a");
+      link.href = response.data.url;
+      link.rel = "noopener noreferrer";
+      link.download = storagePath.split("/").pop() || "duewise-file";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not download file.");
+    } finally {
+      setDownloadingPath("");
+    }
+  }
+
   const singular = title.toLowerCase().replace(/s$/, "");
 
   return (
@@ -812,17 +877,30 @@ export function ResourcePage({
                           {form.watch(field.upload.storagePathField) ? "Replace file" : "Choose file"}
                         </label>
                         {form.watch(field.upload.storagePathField) ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full sm:w-auto"
-                            disabled={openingPath === form.watch(field.upload.storagePathField)}
-                            onClick={() => openStoredFile(form.watch(field.upload!.storagePathField))}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            Open
-                          </Button>
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full sm:w-auto"
+                              disabled={openingPath === form.watch(field.upload.storagePathField)}
+                              onClick={() => openStoredFile(form.watch(field.upload!.storagePathField))}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Open
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full sm:w-auto"
+                              disabled={downloadingPath === form.watch(field.upload.storagePathField)}
+                              onClick={() => downloadStoredFile(form.watch(field.upload!.storagePathField))}
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </Button>
+                          </>
                         ) : null}
                       </div>
                     </div>
@@ -947,6 +1025,7 @@ export function ResourcePage({
               onEdit={startEdit}
               onDelete={remove}
               onOpenFile={openStoredFile}
+              onDownloadFile={downloadStoredFile}
             />
           ) : null}
 
@@ -972,7 +1051,7 @@ export function ResourcePage({
                     <div key={column.key} className="flex items-center justify-between gap-3">
                       <dt className="text-muted">{column.label}</dt>
                       <dd className="min-w-0 truncate text-right font-medium text-ink/85">
-                        {renderCell(column, item, relationOptions, openStoredFile, openingPath, previewUrls)}
+                        {renderCell(column, item, relationOptions, openStoredFile, downloadStoredFile, openingPath, downloadingPath, previewUrls)}
                       </dd>
                     </div>
                   ))}
@@ -1003,7 +1082,7 @@ export function ResourcePage({
                           key={column.key}
                           className={`px-5 py-3.5 ${index === 0 ? "font-semibold text-ink" : "text-ink/75"}`}
                         >
-                          {renderCell(column, item, relationOptions, openStoredFile, openingPath, previewUrls)}
+                          {renderCell(column, item, relationOptions, openStoredFile, downloadStoredFile, openingPath, downloadingPath, previewUrls)}
                         </td>
                       ))}
                       <td className="px-5 py-3.5">
