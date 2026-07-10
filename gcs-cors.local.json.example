@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["http://localhost:3000","http://localhost:3001"],
+    "origin": ["http://localhost:3000","http://localhost:3001", "https://duewise.aamsdn.space"],
     "method": ["PUT", "GET", "HEAD"],
     "responseHeader": ["Content-Type", "x-goog-resumable"],
     "maxAgeSeconds": 3600

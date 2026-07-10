@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Edit2, Inbox, Plus, Search, Trash2, UploadCloud, X } from "lucide-react";
+import { Edit2, ExternalLink, Inbox, Plus, Search, Trash2, UploadCloud, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -64,6 +64,7 @@ type ResourcePageProps = {
 type ApiList = { data: Record<string, unknown>[] };
 type ApiItem = { data: Record<string, unknown> };
 type UploadResponse = { data: { uploadUrl: string; storagePath: string; fileUrl: string } };
+type SignedReadResponse = { data: { url: string } };
 
 function uploadErrorMessage(error: unknown) {
   if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
@@ -80,10 +81,28 @@ function relationLabel(config: RelationConfig, value: unknown, relationOptions: 
 function renderCell(
   column: Column,
   item: Record<string, unknown>,
-  relationOptions: Record<string, Record<string, string>>
+  relationOptions: Record<string, Record<string, string>>,
+  openStoredFile: (storagePath: unknown) => void,
+  openingPath: string
 ) {
   const raw = item[column.key];
   if (column.relation) return relationLabel(column.relation, raw, relationOptions);
+  if (column.key === "storagePath") {
+    if (!raw || typeof raw !== "string") return "—";
+    return (
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="h-8 gap-1.5 px-2.5"
+        disabled={openingPath === raw}
+        onClick={() => openStoredFile(raw)}
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+        {openingPath === raw ? "Opening" : "Open"}
+      </Button>
+    );
+  }
   const text = column.format ? column.format(raw, item) : String(raw ?? "—");
   if (column.key === "status" && text && text !== "—") {
     return <Badge tone={statusTone(text)}>{text}</Badge>;
@@ -112,6 +131,7 @@ export function ResourcePage({
   const [formOpen, setFormOpen] = useState(false);
   const [relationOptions, setRelationOptions] = useState<Record<string, Record<string, string>>>({});
   const [uploadingField, setUploadingField] = useState("");
+  const [openingPath, setOpeningPath] = useState("");
   const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
     defaultValues: defaults
@@ -258,6 +278,23 @@ export function ResourcePage({
     }
   }
 
+  async function openStoredFile(storagePath: unknown) {
+    if (!storagePath || typeof storagePath !== "string") return;
+    setError("");
+    setOpeningPath(storagePath);
+    try {
+      const response = await apiFetch<SignedReadResponse>("/api/storage/read-url", {
+        method: "POST",
+        body: JSON.stringify({ storagePath })
+      });
+      window.open(response.data.url, "_blank", "noopener,noreferrer");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not open file.");
+    } finally {
+      setOpeningPath("");
+    }
+  }
+
   const singular = title.toLowerCase().replace(/s$/, "");
 
   return (
@@ -339,23 +376,46 @@ export function ResourcePage({
                   <div className="rounded-2xl border border-dashed border-line bg-panel/35 p-4">
                     <input type="hidden" {...form.register(field.upload.storagePathField)} />
                     <input type="hidden" {...form.register(field.upload.urlField)} />
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <input
+                      id={`${title}-${field.name}-input`}
+                      className="sr-only"
+                      type="file"
+                      accept={field.upload.accept}
+                      disabled={uploadingField === field.name}
+                      onChange={(event) => void uploadFile(field, event.target.files?.[0])}
+                    />
+                    <div className="grid gap-3">
                       <div className="min-w-0">
                         <span className="flex items-center gap-2 text-sm font-semibold text-ink">
                           <UploadCloud className="h-4 w-4 text-brand" />
-                          Upload file
+                          Uploaded file
                         </span>
-                        <span className="mt-1 block truncate text-xs font-normal text-muted">
-                          {String(form.watch(field.upload.storagePathField) || field.placeholder || "No file uploaded yet")}
+                        <span className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs font-normal text-muted">
+                          {form.watch(field.upload.storagePathField) ? "File uploaded. Save this entry to keep it attached." : field.placeholder || "No file uploaded yet"}
                         </span>
                       </div>
-                      <Input
-                        className="h-auto max-w-full cursor-pointer p-2 sm:max-w-64"
-                        type="file"
-                        accept={field.upload.accept}
-                        disabled={uploadingField === field.name}
-                        onChange={(event) => void uploadFile(field, event.target.files?.[0])}
-                      />
+                      <div className="flex flex-wrap gap-2">
+                        <label
+                          htmlFor={`${title}-${field.name}-input`}
+                          className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink transition-colors hover:bg-panel sm:w-auto"
+                        >
+                          <UploadCloud className="h-4 w-4" />
+                          {form.watch(field.upload.storagePathField) ? "Replace file" : "Choose file"}
+                        </label>
+                        {form.watch(field.upload.storagePathField) ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full sm:w-auto"
+                            disabled={openingPath === form.watch(field.upload.storagePathField)}
+                            onClick={() => openStoredFile(form.watch(field.upload!.storagePathField))}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            Open
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                     {uploadingField === field.name && <span className="mt-2 block text-xs font-medium text-brand">Uploading...</span>}
                   </div>
@@ -433,7 +493,7 @@ export function ResourcePage({
                     <div key={column.key} className="flex items-center justify-between gap-3">
                       <dt className="text-muted">{column.label}</dt>
                       <dd className="min-w-0 truncate text-right font-medium text-ink/85">
-                        {renderCell(column, item, relationOptions)}
+                        {renderCell(column, item, relationOptions, openStoredFile, openingPath)}
                       </dd>
                     </div>
                   ))}
@@ -464,7 +524,7 @@ export function ResourcePage({
                           key={column.key}
                           className={`px-5 py-3.5 ${index === 0 ? "font-semibold text-ink" : "text-ink/75"}`}
                         >
-                          {renderCell(column, item, relationOptions)}
+                          {renderCell(column, item, relationOptions, openStoredFile, openingPath)}
                         </td>
                       ))}
                       <td className="px-5 py-3.5">
