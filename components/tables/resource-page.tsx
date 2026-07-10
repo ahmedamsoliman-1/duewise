@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Edit2, ExternalLink, Inbox, Plus, Search, Trash2, UploadCloud, X } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -66,11 +67,18 @@ type ApiItem = { data: Record<string, unknown> };
 type UploadResponse = { data: { uploadUrl: string; storagePath: string; fileUrl: string } };
 type SignedReadResponse = { data: { url: string } };
 
+const imageExtensions = new Set(["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"]);
+
 function uploadErrorMessage(error: unknown) {
   if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
     return "Upload could not reach Google Cloud Storage. Check the bucket CORS settings for http://localhost:3000, then try again.";
   }
   return error instanceof Error ? error.message : "Could not upload file.";
+}
+
+function isPreviewableImage(storagePath: string) {
+  const extension = storagePath.split("?")[0].split(".").pop()?.toLowerCase();
+  return Boolean(extension && imageExtensions.has(extension));
 }
 
 function relationLabel(config: RelationConfig, value: unknown, relationOptions: Record<string, Record<string, string>>) {
@@ -83,24 +91,37 @@ function renderCell(
   item: Record<string, unknown>,
   relationOptions: Record<string, Record<string, string>>,
   openStoredFile: (storagePath: unknown) => void,
-  openingPath: string
+  openingPath: string,
+  previewUrls: Record<string, string>
 ) {
   const raw = item[column.key];
   if (column.relation) return relationLabel(column.relation, raw, relationOptions);
   if (column.key === "storagePath") {
     if (!raw || typeof raw !== "string") return "—";
     return (
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="h-8 gap-1.5 px-2.5"
-        disabled={openingPath === raw}
-        onClick={() => openStoredFile(raw)}
-      >
-        <ExternalLink className="h-3.5 w-3.5" />
-        {openingPath === raw ? "Opening" : "Open"}
-      </Button>
+      <div className="flex items-center justify-end gap-2 md:justify-start">
+        {previewUrls[raw] ? (
+          <button
+            type="button"
+            className="block h-12 w-12 overflow-hidden rounded-lg border border-line bg-panel"
+            onClick={() => openStoredFile(raw)}
+            title="Open image"
+          >
+            <Image className="h-full w-full object-cover" src={previewUrls[raw]} alt="" width={48} height={48} unoptimized />
+          </button>
+        ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5"
+          disabled={openingPath === raw}
+          onClick={() => openStoredFile(raw)}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          {openingPath === raw ? "Opening" : "Open"}
+        </Button>
+      </div>
     );
   }
   const text = column.format ? column.format(raw, item) : String(raw ?? "—");
@@ -132,6 +153,7 @@ export function ResourcePage({
   const [relationOptions, setRelationOptions] = useState<Record<string, Record<string, string>>>({});
   const [uploadingField, setUploadingField] = useState("");
   const [openingPath, setOpeningPath] = useState("");
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
     defaultValues: defaults
@@ -145,6 +167,14 @@ export function ResourcePage({
     const needle = query.toLowerCase();
     return items.filter((item) => JSON.stringify(item).toLowerCase().includes(needle));
   }, [items, query]);
+
+  const previewPathKey = useMemo(() => {
+    const paths = filtered
+      .map((item) => item.storagePath)
+      .filter((value): value is string => typeof value === "string" && isPreviewableImage(value))
+      .sort();
+    return JSON.stringify(paths);
+  }, [filtered]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -194,6 +224,36 @@ export function ResourcePage({
       alive = false;
     };
   }, [columns, fields, relationKey]);
+
+  useEffect(() => {
+    const paths = JSON.parse(previewPathKey) as string[];
+    const missing = paths.filter((path) => !previewUrls[path]);
+    if (missing.length === 0) return;
+
+    let alive = true;
+    async function loadPreviews() {
+      const loaded = await Promise.all(
+        missing.map(async (storagePath) => {
+          const response = await apiFetch<SignedReadResponse>("/api/storage/read-url", {
+            method: "POST",
+            body: JSON.stringify({ storagePath })
+          });
+          return [storagePath, response.data.url] as const;
+        })
+      );
+      if (alive) {
+        setPreviewUrls((current) => ({ ...current, ...Object.fromEntries(loaded) }));
+      }
+    }
+
+    loadPreviews().catch(() => {
+      if (alive) setPreviewUrls((current) => ({ ...current }));
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [previewPathKey, previewUrls]);
 
   function startEdit(item: Record<string, unknown>) {
     setEditing(item);
@@ -493,7 +553,7 @@ export function ResourcePage({
                     <div key={column.key} className="flex items-center justify-between gap-3">
                       <dt className="text-muted">{column.label}</dt>
                       <dd className="min-w-0 truncate text-right font-medium text-ink/85">
-                        {renderCell(column, item, relationOptions, openStoredFile, openingPath)}
+                        {renderCell(column, item, relationOptions, openStoredFile, openingPath, previewUrls)}
                       </dd>
                     </div>
                   ))}
@@ -524,7 +584,7 @@ export function ResourcePage({
                           key={column.key}
                           className={`px-5 py-3.5 ${index === 0 ? "font-semibold text-ink" : "text-ink/75"}`}
                         >
-                          {renderCell(column, item, relationOptions, openStoredFile, openingPath)}
+                          {renderCell(column, item, relationOptions, openStoredFile, openingPath, previewUrls)}
                         </td>
                       ))}
                       <td className="px-5 py-3.5">
