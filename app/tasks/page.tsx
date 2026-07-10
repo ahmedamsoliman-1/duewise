@@ -116,7 +116,7 @@ export default function TasksPage() {
           name: "familyMemberId",
           label: "Assigned family member",
           type: "relation",
-          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned" }
+          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned", includeSelf: true }
         },
         {
           name: "linkedDocumentId",
@@ -137,7 +137,7 @@ export default function TasksPage() {
         { key: "category", label: "Category" },
         { key: "dueDate", label: "Due" },
         { key: "status", label: "Status" },
-        { key: "familyMemberId", label: "Assigned", relation: { endpoint: "/api/family", labelKey: "name" } },
+        { key: "familyMemberId", label: "Assigned", relation: { endpoint: "/api/family", labelKey: "name", includeSelf: true } },
         { key: "linkedDocumentId", label: "Document", relation: { endpoint: "/api/documents", labelKey: "title" } },
         { key: "notes", label: "Notes" }
       ]}

@@ -1,7 +1,21 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Edit2, ExternalLink, Inbox, Plus, Search, Trash2, UploadCloud, X } from "lucide-react";
+import {
+  Edit2,
+  ExternalLink,
+  FileText,
+  Grid2X2,
+  Inbox,
+  List,
+  Plus,
+  Search,
+  Trash2,
+  UploadCloud,
+  UserRound,
+  Users,
+  X
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -11,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api/client";
+import { SELF_FAMILY_MEMBER_ID, SELF_FAMILY_MEMBER_LABEL } from "@/lib/family/self";
 
 type Field = {
   name: string;
@@ -26,6 +41,7 @@ type RelationConfig = {
   endpoint: string;
   labelKey: string;
   emptyLabel?: string;
+  includeSelf?: boolean;
 };
 
 type UploadConfig = {
@@ -60,6 +76,8 @@ type ResourcePageProps = {
   defaults: Record<string, unknown>;
   templates?: ResourceTemplate[];
   prepareSubmit?: (values: Record<string, unknown>) => Record<string, unknown>;
+  visualMode?: "familyTree";
+  preferredListView?: "grid" | "table";
 };
 
 type ApiList = { data: Record<string, unknown>[] };
@@ -83,6 +101,7 @@ function isPreviewableImage(storagePath: string) {
 
 function relationLabel(config: RelationConfig, value: unknown, relationOptions: Record<string, Record<string, string>>) {
   if (!value || typeof value !== "string") return "—";
+  if (config.includeSelf && value === SELF_FAMILY_MEMBER_ID) return SELF_FAMILY_MEMBER_LABEL;
   return relationOptions[config.endpoint]?.[value] ?? value;
 }
 
@@ -131,6 +150,184 @@ function renderCell(
   return text || "—";
 }
 
+function initials(name: unknown) {
+  return String(name ?? "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+function FamilyTreePreview({
+  items,
+  onEdit
+}: {
+  items: Record<string, unknown>[];
+  onEdit: (item: Record<string, unknown>) => void;
+}) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="border-b border-line bg-panel/40 p-5 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-brand-strong">
+              <Users className="h-4 w-4" />
+              Household tree
+            </span>
+            <h2 className="mt-1 font-display text-xl font-extrabold text-ink">Family around you</h2>
+          </div>
+          <Badge tone="brand">{items.length} members</Badge>
+        </div>
+      </div>
+
+      <div className="p-5 sm:p-6">
+        <div className="mx-auto grid max-w-4xl justify-items-center gap-6">
+          <div className="relative grid justify-items-center gap-3">
+            <div className="grid h-20 w-20 place-items-center rounded-3xl bg-brand-gradient text-white shadow-glow">
+              <UserRound className="h-9 w-9" />
+            </div>
+            <div className="text-center">
+              <p className="font-display text-lg font-extrabold text-ink">{SELF_FAMILY_MEMBER_LABEL}</p>
+              <p className="text-sm text-muted">Account owner</p>
+            </div>
+          </div>
+
+          <div className="h-8 w-px bg-line" />
+
+          <div className="grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {items.map((item) => (
+              <button
+                key={String(item.id)}
+                type="button"
+                onClick={() => onEdit(item)}
+                className="group rounded-2xl border border-line bg-surface p-4 text-left shadow-sm transition-colors hover:border-brand/30 hover:bg-brand-soft/25"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-panel text-sm font-extrabold text-brand-strong ring-1 ring-line">
+                    {initials(item.name)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-ink">{String(item.name ?? "Unnamed")}</span>
+                    <span className="block truncate text-sm text-muted">{String(item.relationship ?? "Family")}</span>
+                  </span>
+                </div>
+                {item.dateOfBirth ? (
+                  <span className="mt-3 inline-flex rounded-full bg-panel px-2.5 py-1 text-xs font-semibold text-ink/70">
+                    {String(item.dateOfBirth)}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ResourceGridCards({
+  items,
+  columns,
+  relationOptions,
+  previewUrls,
+  openingPath,
+  onEdit,
+  onDelete,
+  onOpenFile
+}: {
+  items: Record<string, unknown>[];
+  columns: Column[];
+  relationOptions: Record<string, Record<string, string>>;
+  previewUrls: Record<string, string>;
+  openingPath: string;
+  onEdit: (item: Record<string, unknown>) => void;
+  onDelete: (id: unknown) => void;
+  onOpenFile: (storagePath: unknown) => void;
+}) {
+  const titleColumn = columns[0];
+  const detailColumns = columns.filter((column) => column.key !== titleColumn.key && column.key !== "storagePath");
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {items.map((item) => {
+        const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
+        const previewUrl = storagePath ? previewUrls[storagePath] : "";
+
+        return (
+          <Card key={String(item.id)} className="overflow-hidden p-0">
+            <button
+              type="button"
+              className="relative block aspect-[4/3] w-full overflow-hidden bg-panel text-left"
+              onClick={() => (storagePath ? onOpenFile(storagePath) : onEdit(item))}
+            >
+              {previewUrl ? (
+                <Image className="h-full w-full object-cover" src={previewUrl} alt="" fill sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 100vw" unoptimized />
+              ) : (
+                <span className="grid h-full place-items-center bg-panel/80">
+                  <span className="grid h-16 w-16 place-items-center rounded-2xl bg-surface text-brand-strong shadow-sm ring-1 ring-line">
+                    <FileText className="h-8 w-8" />
+                  </span>
+                </span>
+              )}
+              {storagePath ? (
+                <span className="absolute right-3 top-3 rounded-full bg-surface/90 px-2.5 py-1 text-xs font-semibold text-ink shadow-sm ring-1 ring-line backdrop-blur">
+                  {openingPath === storagePath ? "Opening" : "Open"}
+                </span>
+              ) : null}
+            </button>
+
+            <div className="grid gap-4 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate font-display text-lg font-extrabold text-ink">
+                    {String(item[titleColumn.key] ?? "Untitled")}
+                  </h3>
+                  <p className="mt-1 truncate text-sm text-muted">
+                    {String(item.type ?? item.ownerName ?? "Document")}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => onEdit(item)} title="Edit">
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDelete(item.id)} title="Delete">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <dl className="grid gap-2 text-sm">
+                {detailColumns.slice(0, 5).map((column) => (
+                  <div key={column.key} className="flex items-center justify-between gap-3">
+                    <dt className="text-muted">{column.label}</dt>
+                    <dd className="min-w-0 truncate text-right font-medium text-ink/85">
+                      {column.relation
+                        ? relationLabel(column.relation, item[column.key], relationOptions)
+                        : column.format
+                          ? column.format(item[column.key], item)
+                          : String(item[column.key] ?? "—")}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {storagePath ? (
+                <Button type="button" variant="secondary" size="sm" onClick={() => onOpenFile(storagePath)}>
+                  <ExternalLink className="h-4 w-4" />
+                  {openingPath === storagePath ? "Opening" : "Open file"}
+                </Button>
+              ) : (
+                <Badge tone="neutral" className="w-fit">No file attached</Badge>
+              )}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ResourcePage({
   title,
   description,
@@ -142,7 +339,9 @@ export function ResourcePage({
   emptyBody,
   defaults,
   templates = [],
-  prepareSubmit
+  prepareSubmit,
+  visualMode,
+  preferredListView
 }: ResourcePageProps) {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,13 +353,14 @@ export function ResourcePage({
   const [uploadingField, setUploadingField] = useState("");
   const [openingPath, setOpeningPath] = useState("");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [listView, setListView] = useState<"grid" | "table">(preferredListView ?? "table");
   const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
     defaultValues: defaults
   });
   const relationKey = useMemo(() => {
     const configs = [...fields.map((field) => field.relation), ...columns.map((column) => column.relation)].filter(Boolean) as RelationConfig[];
-    return JSON.stringify(configs.map((config) => `${config.endpoint}:${config.labelKey}:${config.emptyLabel ?? ""}`).sort());
+    return JSON.stringify(configs.map((config) => `${config.endpoint}:${config.labelKey}:${config.emptyLabel ?? ""}:${config.includeSelf ? "self" : ""}`).sort());
   }, [columns, fields]);
 
   const filtered = useMemo(() => {
@@ -205,11 +405,14 @@ export function ResourcePage({
       const loaded = await Promise.all(
         unique.map(async (config) => {
           const response = await apiFetch<ApiList>(config.endpoint);
-          const labels = Object.fromEntries(
-            response.data
-              .filter((item) => typeof item.id === "string")
-              .map((item) => [String(item.id), String(item[config.labelKey] ?? item.id)])
-          );
+          const labels = {
+            ...(config.includeSelf ? { [SELF_FAMILY_MEMBER_ID]: SELF_FAMILY_MEMBER_LABEL } : {}),
+            ...Object.fromEntries(
+              response.data
+                .filter((item) => typeof item.id === "string")
+                .map((item) => [String(item.id), String(item[config.labelKey] ?? item.id)])
+            )
+          };
           return [config.endpoint, labels] as const;
         })
       );
@@ -374,6 +577,26 @@ export function ResourcePage({
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
+          {preferredListView ? (
+            <div className="hidden rounded-xl border border-line bg-surface p-1 sm:flex">
+              <button
+                type="button"
+                className={`grid h-9 w-9 place-items-center rounded-lg transition-colors ${listView === "grid" ? "bg-brand-soft text-brand-strong" : "text-muted hover:bg-panel"}`}
+                onClick={() => setListView("grid")}
+                title="Grid view"
+              >
+                <Grid2X2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className={`grid h-9 w-9 place-items-center rounded-lg transition-colors ${listView === "table" ? "bg-brand-soft text-brand-strong" : "text-muted hover:bg-panel"}`}
+                onClick={() => setListView("table")}
+                title="List view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
           {!formOpen && (
             <Button className="shrink-0" onClick={() => setFormOpen(true)}>
               <Plus className="h-4 w-4" />
@@ -512,6 +735,31 @@ export function ResourcePage({
         </p>
       )}
 
+      {visualMode === "familyTree" && !loading && (
+        <FamilyTreePreview items={filtered} onEdit={startEdit} />
+      )}
+
+      {preferredListView && !loading && filtered.length > 0 ? (
+        <div className="flex rounded-xl border border-line bg-surface p-1 sm:hidden">
+          <button
+            type="button"
+            className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-colors ${listView === "grid" ? "bg-brand-soft text-brand-strong" : "text-muted"}`}
+            onClick={() => setListView("grid")}
+          >
+            <Grid2X2 className="h-4 w-4" />
+            Grid
+          </button>
+          <button
+            type="button"
+            className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-colors ${listView === "table" ? "bg-brand-soft text-brand-strong" : "text-muted"}`}
+            onClick={() => setListView("table")}
+          >
+            <List className="h-4 w-4" />
+            List
+          </button>
+        </div>
+      ) : null}
+
       {/* List */}
       {loading ? (
         <Card>
@@ -531,8 +779,21 @@ export function ResourcePage({
         </Card>
       ) : (
         <>
+          {preferredListView && listView === "grid" ? (
+            <ResourceGridCards
+              items={filtered}
+              columns={columns}
+              relationOptions={relationOptions}
+              previewUrls={previewUrls}
+              openingPath={openingPath}
+              onEdit={startEdit}
+              onDelete={remove}
+              onOpenFile={openStoredFile}
+            />
+          ) : null}
+
           {/* Mobile cards */}
-          <div className="grid gap-3 md:hidden">
+          <div className={`grid gap-3 md:hidden ${preferredListView && listView === "grid" ? "hidden" : ""}`}>
             {filtered.map((item) => (
               <Card key={String(item.id)} className="p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -563,7 +824,7 @@ export function ResourcePage({
           </div>
 
           {/* Desktop table */}
-          <Card className="hidden overflow-hidden p-0 md:block">
+          <Card className={`${preferredListView && listView === "grid" ? "hidden" : "hidden md:block"} overflow-hidden p-0`}>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-sm">
                 <thead className="border-b border-line bg-panel/50 text-xs uppercase tracking-wide text-muted">

@@ -25,6 +25,7 @@ export default function FamilyPage() {
       ]}
       emptyTitle="No family members yet"
       emptyBody="Add family or household members to make passports, appointments, school payments, and shared documents easier to organize."
+      visualMode="familyTree"
     />
   );
 }

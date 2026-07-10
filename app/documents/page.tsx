@@ -83,7 +83,7 @@ export default function DocumentsPage() {
           name: "familyMemberId",
           label: "Assigned family member",
           type: "relation",
-          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned" }
+          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned", includeSelf: true }
         },
         { name: "expiryDate", label: "Expiry date", type: "date" },
         {
@@ -105,7 +105,7 @@ export default function DocumentsPage() {
         { key: "title", label: "Document" },
         { key: "type", label: "Type" },
         { key: "ownerName", label: "Owner" },
-        { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name" } },
+        { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name", includeSelf: true } },
         { key: "expiryDate", label: "Expiry" },
         { key: "storagePath", label: "File", format: (value) => (value ? "Uploaded" : "—") },
         { key: "tags", label: "Tags", format: (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? "-")) }
@@ -113,6 +113,7 @@ export default function DocumentsPage() {
       emptyTitle="Your vault is empty"
       emptyBody="Start with IDs, passports, visas, leases, policies, receipts, and warranties. Files stay under your user-scoped Firebase Storage path."
       templates={documentTemplates}
+      preferredListView="grid"
     />
   );
 }

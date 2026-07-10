@@ -140,7 +140,7 @@ export default function LifeEventsPage() {
           name: "familyMemberId",
           label: "Linked family member",
           type: "relation",
-          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "No linked family member" }
+          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "No linked family member", includeSelf: true }
         },
         { name: "location", label: "Location", placeholder: "City, country, venue" },
         { name: "importance", label: "Importance", type: "select", options: ["low", "medium", "high", "landmark"] },
@@ -152,7 +152,7 @@ export default function LifeEventsPage() {
         { key: "type", label: "Type" },
         { key: "date", label: "Date" },
         { key: "personName", label: "Person" },
-        { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name" } },
+        { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name", includeSelf: true } },
         { key: "location", label: "Location" },
         { key: "importance", label: "Importance" }
       ]}

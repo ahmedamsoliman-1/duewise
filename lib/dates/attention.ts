@@ -1,4 +1,5 @@
 import { compareAsc, differenceInCalendarDays, parseISO } from "date-fns";
+import { SELF_FAMILY_MEMBER_ID, SELF_FAMILY_MEMBER_LABEL } from "@/lib/family/self";
 import type { DuewiseDocument, FamilyMember, InventoryItem, LifeEvent, Subscription, Task } from "@/types";
 
 export type AttentionSeverity = "critical" | "high" | "medium" | "low";
@@ -51,6 +52,7 @@ function scoreByWindow(days: number, maxWindow: number, overdueBoost = 0) {
 export function buildAttentionItems(input: AttentionInput, today = new Date()) {
   const normalizedToday = new Date(today.toDateString());
   const familyNames = new Map(input.familyMembers.map((member) => [member.id, member.name]));
+  familyNames.set(SELF_FAMILY_MEMBER_ID, SELF_FAMILY_MEMBER_LABEL);
   const documentTitles = new Map(input.documents.map((document) => [document.id, document.title]));
 
   const items: AttentionItem[] = [];
