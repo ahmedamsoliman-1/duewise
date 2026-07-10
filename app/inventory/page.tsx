@@ -3,6 +3,59 @@
 import { ResourcePage } from "@/components/tables/resource-page";
 import { inventorySchema } from "@/lib/validators/schemas";
 
+const inventoryTemplates = [
+  {
+    title: "Laptop",
+    description: "Electronics item with warranty and receipt.",
+    values: {
+      name: "Laptop",
+      category: "Electronics",
+      currency: "USD",
+      notes: "Add serial number, specs, purchase store, warranty terms, and repair history."
+    }
+  },
+  {
+    title: "Phone",
+    description: "Mobile device with serial/IMEI notes.",
+    values: {
+      name: "Phone",
+      category: "Electronics",
+      currency: "USD",
+      notes: "Add model, IMEI/serial, purchase store, warranty, and insurance notes."
+    }
+  },
+  {
+    title: "Appliance",
+    description: "Home appliance warranty tracker.",
+    values: {
+      name: "Home appliance",
+      category: "Appliance",
+      currency: "USD",
+      notes: "Add model, serial number, installer, warranty provider, and service contacts."
+    }
+  },
+  {
+    title: "Jewelry",
+    description: "Valuable personal item for insurance.",
+    values: {
+      name: "Jewelry item",
+      category: "Jewelry",
+      currency: "USD",
+      notes: "Add appraisal value, certificate details, photos, and insurance notes."
+    }
+  },
+  {
+    title: "Vehicle",
+    description: "Car, motorcycle, or major vehicle asset.",
+    values: {
+      name: "Vehicle",
+      category: "Vehicle",
+      currency: "USD",
+      notes: "Add VIN/chassis, registration, insurance, service schedule, and warranty details."
+    }
+  }
+];
+
 export default function InventoryPage() {
   return (
     <ResourcePage
@@ -31,6 +84,7 @@ export default function InventoryPage() {
       ]}
       emptyTitle="No inventory items yet"
       emptyBody="Add appliances, electronics, furniture, jewelry, and other valuable items while the receipt and warranty details are still easy to find."
+      templates={inventoryTemplates}
     />
   );
 }

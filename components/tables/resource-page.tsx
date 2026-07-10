@@ -25,6 +25,12 @@ type Column = {
   format?: (value: unknown, row: Record<string, unknown>) => string;
 };
 
+type ResourceTemplate = {
+  title: string;
+  description: string;
+  values: Record<string, unknown>;
+};
+
 type ResourcePageProps = {
   title: string;
   description: string;
@@ -35,6 +41,8 @@ type ResourcePageProps = {
   emptyTitle: string;
   emptyBody: string;
   defaults: Record<string, unknown>;
+  templates?: ResourceTemplate[];
+  prepareSubmit?: (values: Record<string, unknown>) => Record<string, unknown>;
 };
 
 type ApiList = { data: Record<string, unknown>[] };
@@ -58,7 +66,9 @@ export function ResourcePage({
   columns,
   emptyTitle,
   emptyBody,
-  defaults
+  defaults,
+  templates = [],
+  prepareSubmit
 }: ResourcePageProps) {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,12 +116,20 @@ export function ResourcePage({
     form.reset(defaults);
   }
 
+  function applyTemplate(template: ResourceTemplate) {
+    setEditing(null);
+    setFormOpen(true);
+    form.reset({ ...defaults, ...template.values });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function submit(values: Record<string, unknown>) {
     setError("");
     try {
+      const payload = prepareSubmit ? prepareSubmit(values) : values;
       const response = await apiFetch<ApiItem>(endpoint, {
         method: editing ? "PATCH" : "POST",
-        body: JSON.stringify(editing ? { ...values, id: editing.id } : values)
+        body: JSON.stringify(editing ? { ...payload, id: editing.id } : payload)
       });
       setItems((current) =>
         editing ? current.map((item) => (item.id === editing.id ? response.data : item)) : [...current, response.data]
@@ -160,6 +178,28 @@ export function ResourcePage({
           )}
         </div>
       </header>
+
+      {!formOpen && templates.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Quick starts"
+            description={`Choose a common ${singular} template, then adjust the details before saving.`}
+          />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {templates.map((template) => (
+              <button
+                key={template.title}
+                type="button"
+                onClick={() => applyTemplate(template)}
+                className="rounded-2xl border border-line bg-panel/35 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand-soft/35"
+              >
+                <span className="block font-semibold text-ink">{template.title}</span>
+                <span className="mt-1 block text-sm text-muted">{template.description}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Form */}
       {formOpen && (

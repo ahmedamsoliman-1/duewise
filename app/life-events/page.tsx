@@ -3,6 +3,97 @@
 import { ResourcePage } from "@/components/tables/resource-page";
 import { lifeEventSchema } from "@/lib/validators/schemas";
 
+const lifeEventTemplates = [
+  {
+    title: "Graduation",
+    description: "Education milestone and ceremony details.",
+    values: {
+      title: "Graduation",
+      type: "graduation",
+      importance: "landmark",
+      privacy: "normal",
+      notes: "School or university, degree/program, ceremony details, people present, and documents to keep."
+    }
+  },
+  {
+    title: "Work change",
+    description: "New job, promotion, or career shift.",
+    values: {
+      title: "Started a new role",
+      type: "work",
+      importance: "high",
+      privacy: "normal",
+      notes: "Company, role, start date, contract, benefits, and important onboarding details."
+    }
+  },
+  {
+    title: "National service",
+    description: "Service start, completion, or related milestone.",
+    values: {
+      title: "National service milestone",
+      type: "national service",
+      importance: "landmark",
+      privacy: "sensitive",
+      notes: "Unit/program, start or completion date, certificates, documents, and important memories."
+    }
+  },
+  {
+    title: "Wedding",
+    description: "Marriage or wedding milestone.",
+    values: {
+      title: "Wedding",
+      type: "wedding",
+      importance: "landmark",
+      privacy: "normal",
+      notes: "Venue, legal certificate, guests, photos, and related documents."
+    }
+  },
+  {
+    title: "Birth",
+    description: "Birth event for a child or family member.",
+    values: {
+      title: "Birth",
+      type: "birth",
+      importance: "landmark",
+      privacy: "sensitive",
+      notes: "Hospital, birth certificate, ID/passport follow-up, medical documents, and family notes."
+    }
+  },
+  {
+    title: "Memorial",
+    description: "Death or memorial record handled respectfully.",
+    values: {
+      title: "Memorial",
+      type: "death",
+      importance: "landmark",
+      privacy: "sensitive",
+      notes: "Important dates, certificates, estate/admin follow-up, and memories to preserve."
+    }
+  },
+  {
+    title: "Relocation",
+    description: "Move to a new home, city, or country.",
+    values: {
+      title: "Relocation",
+      type: "relocation",
+      importance: "high",
+      privacy: "normal",
+      notes: "From/to locations, lease or property documents, utilities, registrations, and moving checklist."
+    }
+  },
+  {
+    title: "Property purchase",
+    description: "Home or major property milestone.",
+    values: {
+      title: "Property purchase",
+      type: "property",
+      importance: "landmark",
+      privacy: "sensitive",
+      notes: "Property address, contract, title deed, mortgage, insurance, and handover details."
+    }
+  }
+];
+
 export default function LifeEventsPage() {
   return (
     <ResourcePage
@@ -61,6 +152,7 @@ export default function LifeEventsPage() {
       ]}
       emptyTitle="No life events yet"
       emptyBody="Add the human milestones that belong beside your admin timeline: graduations, work, service, weddings, births, memorials, moves, and the big custom moments."
+      templates={lifeEventTemplates}
     />
   );
 }

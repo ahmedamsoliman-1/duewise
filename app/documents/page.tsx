@@ -3,6 +3,70 @@
 import { ResourcePage } from "@/components/tables/resource-page";
 import { documentSchema } from "@/lib/validators/schemas";
 
+const documentTemplates = [
+  {
+    title: "Passport",
+    description: "Identity document with expiry tracking.",
+    values: {
+      title: "Passport",
+      type: "Passport",
+      tags: "identity, travel",
+      notes: "Add passport number, issuing country, and renewal notes."
+    }
+  },
+  {
+    title: "National ID",
+    description: "ID card or Emirates ID style record.",
+    values: {
+      title: "National ID",
+      type: "ID",
+      tags: "identity",
+      notes: "Track ID number, issuing authority, and expiry."
+    }
+  },
+  {
+    title: "Visa",
+    description: "Residency, work, or travel visa.",
+    values: {
+      title: "Visa",
+      type: "Visa",
+      tags: "identity, immigration",
+      notes: "Add visa number, sponsor, country, renewal requirements, and expiry."
+    }
+  },
+  {
+    title: "Lease",
+    description: "Home lease or tenancy contract.",
+    values: {
+      title: "Lease agreement",
+      type: "Lease",
+      ownerName: "Household",
+      tags: "home, contract",
+      notes: "Track landlord, renewal window, rent amount, deposits, and contract expiry."
+    }
+  },
+  {
+    title: "Insurance policy",
+    description: "Health, vehicle, home, or life insurance.",
+    values: {
+      title: "Insurance policy",
+      type: "Insurance policy",
+      tags: "insurance",
+      notes: "Add provider, policy number, coverage notes, exclusions, and renewal date."
+    }
+  },
+  {
+    title: "Warranty",
+    description: "Warranty certificate for an item.",
+    values: {
+      title: "Warranty certificate",
+      type: "Warranty",
+      tags: "warranty, inventory",
+      notes: "Link this to the inventory item once relationship pickers are enabled."
+    }
+  }
+];
+
 export default function DocumentsPage() {
   return (
     <ResourcePage
@@ -30,6 +94,7 @@ export default function DocumentsPage() {
       ]}
       emptyTitle="Your vault is empty"
       emptyBody="Start with IDs, passports, visas, leases, policies, receipts, and warranties. Files stay under your user-scoped Firebase Storage path."
+      templates={documentTemplates}
     />
   );
 }

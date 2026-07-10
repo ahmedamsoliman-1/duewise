@@ -3,6 +3,61 @@
 import { ResourcePage } from "@/components/tables/resource-page";
 import { subscriptionSchema } from "@/lib/validators/schemas";
 
+const subscriptionTemplates = [
+  {
+    title: "Cloud storage",
+    description: "Monthly software/storage renewal.",
+    values: {
+      name: "Cloud storage",
+      category: "Software",
+      cost: 0,
+      currency: "USD",
+      billingCycle: "monthly",
+      status: "active",
+      notes: "Add plan name, storage limit, renewal policy, and cancellation steps."
+    }
+  },
+  {
+    title: "Streaming",
+    description: "Video, music, or content subscription.",
+    values: {
+      name: "Streaming subscription",
+      category: "Streaming",
+      cost: 0,
+      currency: "USD",
+      billingCycle: "monthly",
+      status: "active",
+      notes: "Track shared users, plan tier, and whether it is still worth keeping."
+    }
+  },
+  {
+    title: "Insurance payment",
+    description: "Recurring insurance premium.",
+    values: {
+      name: "Insurance premium",
+      category: "Insurance",
+      cost: 0,
+      currency: "USD",
+      billingCycle: "monthly",
+      status: "active",
+      notes: "Link policy document later and note renewal/cancellation terms."
+    }
+  },
+  {
+    title: "Membership",
+    description: "Gym, club, or professional membership.",
+    values: {
+      name: "Membership",
+      category: "Membership",
+      cost: 0,
+      currency: "USD",
+      billingCycle: "monthly",
+      status: "active",
+      notes: "Add contract period, freeze policy, cancellation deadline, and benefits."
+    }
+  }
+];
+
 export default function SubscriptionsPage() {
   return (
     <ResourcePage
@@ -32,6 +87,7 @@ export default function SubscriptionsPage() {
       ]}
       emptyTitle="No recurring payments tracked"
       emptyBody="Add subscriptions, memberships, insurance payments, and other repeating charges to understand your monthly spend."
+      templates={subscriptionTemplates}
     />
   );
 }
