@@ -159,6 +159,50 @@ function initials(name: unknown) {
     .join("");
 }
 
+function relationshipGroup(item: Record<string, unknown>) {
+  const relationship = String(item.relationship ?? "").toLowerCase();
+  if (/\b(mother|father|parent|mom|mum|dad|stepmother|stepfather)\b/.test(relationship)) return "parents";
+  if (/\b(wife|husband|spouse|partner)\b/.test(relationship)) return "partner";
+  if (/\b(son|daughter|child|kid|children)\b/.test(relationship)) return "children";
+  if (/\b(brother|sister|sibling)\b/.test(relationship)) return "siblings";
+  return "other";
+}
+
+function FamilyMemberNode({
+  item,
+  onEdit,
+  compact = false
+}: {
+  item: Record<string, unknown>;
+  onEdit: (item: Record<string, unknown>) => void;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onEdit(item)}
+      className={`group rounded-2xl border border-line bg-surface text-left shadow-sm transition-colors hover:border-brand/30 hover:bg-brand-soft/25 ${
+        compact ? "p-3" : "p-4"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-panel text-sm font-extrabold text-brand-strong ring-1 ring-line">
+          {initials(item.name)}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate font-semibold text-ink">{String(item.name ?? "Unnamed")}</span>
+          <span className="block truncate text-sm text-muted">{String(item.relationship ?? "Family")}</span>
+        </span>
+      </div>
+      {item.dateOfBirth ? (
+        <span className="mt-3 inline-flex rounded-full bg-panel px-2.5 py-1 text-xs font-semibold text-ink/70">
+          {String(item.dateOfBirth)}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 function FamilyTreePreview({
   items,
   onEdit
@@ -166,6 +210,12 @@ function FamilyTreePreview({
   items: Record<string, unknown>[];
   onEdit: (item: Record<string, unknown>) => void;
 }) {
+  const parents = items.filter((item) => relationshipGroup(item) === "parents");
+  const partner = items.filter((item) => relationshipGroup(item) === "partner");
+  const children = items.filter((item) => relationshipGroup(item) === "children");
+  const siblings = items.filter((item) => relationshipGroup(item) === "siblings");
+  const other = items.filter((item) => relationshipGroup(item) === "other");
+
   return (
     <Card className="overflow-hidden p-0">
       <div className="border-b border-line bg-panel/40 p-5 sm:p-6">
@@ -182,44 +232,85 @@ function FamilyTreePreview({
       </div>
 
       <div className="p-5 sm:p-6">
-        <div className="mx-auto grid max-w-4xl justify-items-center gap-6">
-          <div className="relative grid justify-items-center gap-3">
-            <div className="grid h-20 w-20 place-items-center rounded-3xl bg-brand-gradient text-white shadow-glow">
-              <UserRound className="h-9 w-9" />
-            </div>
-            <div className="text-center">
-              <p className="font-display text-lg font-extrabold text-ink">{SELF_FAMILY_MEMBER_LABEL}</p>
-              <p className="text-sm text-muted">Account owner</p>
-            </div>
-          </div>
+        <div className="mx-auto grid max-w-5xl justify-items-center gap-5">
+          {parents.length > 0 && (
+            <>
+              <div className="grid w-full max-w-2xl gap-3 sm:grid-cols-2">
+                {parents.map((item) => (
+                  <FamilyMemberNode key={String(item.id)} item={item} onEdit={onEdit} />
+                ))}
+              </div>
+              <div className="h-8 w-px bg-line" />
+            </>
+          )}
 
-          <div className="h-8 w-px bg-line" />
-
-          <div className="grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((item) => (
-              <button
-                key={String(item.id)}
-                type="button"
-                onClick={() => onEdit(item)}
-                className="group rounded-2xl border border-line bg-surface p-4 text-left shadow-sm transition-colors hover:border-brand/30 hover:bg-brand-soft/25"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-panel text-sm font-extrabold text-brand-strong ring-1 ring-line">
-                    {initials(item.name)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-ink">{String(item.name ?? "Unnamed")}</span>
-                    <span className="block truncate text-sm text-muted">{String(item.relationship ?? "Family")}</span>
-                  </span>
+          <div className="grid w-full justify-items-center gap-4">
+            <div className="grid w-full max-w-3xl items-center justify-items-center gap-3 md:grid-cols-[1fr_56px_1fr]">
+              <div className="grid justify-items-center gap-3">
+                <div className="grid h-20 w-20 place-items-center rounded-3xl bg-brand-gradient text-white shadow-glow">
+                  <UserRound className="h-9 w-9" />
                 </div>
-                {item.dateOfBirth ? (
-                  <span className="mt-3 inline-flex rounded-full bg-panel px-2.5 py-1 text-xs font-semibold text-ink/70">
-                    {String(item.dateOfBirth)}
-                  </span>
-                ) : null}
-              </button>
-            ))}
+                <div className="text-center">
+                  <p className="font-display text-lg font-extrabold text-ink">{SELF_FAMILY_MEMBER_LABEL}</p>
+                  <p className="text-sm text-muted">Account owner</p>
+                </div>
+              </div>
+
+              <div className="hidden h-px w-full bg-line md:block" />
+              <div className="h-7 w-px bg-line md:hidden" />
+
+              {partner.length > 0 ? (
+                <div className="grid w-full gap-3">
+                  <p className="text-center text-xs font-semibold uppercase text-muted">Spouse / partner</p>
+                  {partner.map((item) => (
+                    <FamilyMemberNode key={String(item.id)} item={item} onEdit={onEdit} compact />
+                  ))}
+                </div>
+              ) : (
+                <div className="hidden md:block" />
+              )}
+            </div>
           </div>
+
+          {children.length > 0 && (
+            <>
+              <div className="grid justify-items-center gap-0">
+                <div className="h-8 w-px bg-line" />
+                <div className="h-px w-32 bg-line sm:w-72" />
+              </div>
+              <div className="grid w-full max-w-3xl gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {children.map((item) => (
+                  <FamilyMemberNode key={String(item.id)} item={item} onEdit={onEdit} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {(siblings.length > 0 || other.length > 0) && (
+            <div className="mt-2 grid w-full gap-4 lg:grid-cols-2">
+              {siblings.length > 0 && (
+                <div className="grid gap-3">
+                  <p className="text-xs font-semibold uppercase text-muted">Siblings</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {siblings.map((item) => (
+                      <FamilyMemberNode key={String(item.id)} item={item} onEdit={onEdit} compact />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {other.length > 0 && (
+                <div className="grid gap-3">
+                  <p className="text-xs font-semibold uppercase text-muted">Extended family</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {other.map((item) => (
+                      <FamilyMemberNode key={String(item.id)} item={item} onEdit={onEdit} compact />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </Card>
