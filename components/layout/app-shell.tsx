@@ -90,6 +90,11 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
   );
 }
 
+async function signOutDuewise() {
+  await fetch("/api/mfa/session", { method: "DELETE" }).catch(() => undefined);
+  await signOut(auth);
+}
+
 function ForegroundNotifications() {
   useEffect(() => {
     let unsubscribe: undefined | (() => void);
@@ -190,7 +195,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
               <button
                 type="button"
-                onClick={() => signOut(auth)}
+                onClick={signOutDuewise}
                 title="Sign out"
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink/55 transition-colors hover:bg-ink/[0.06] hover:text-ink"
               >
@@ -299,7 +304,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <button
               type="button"
-              onClick={() => signOut(auth)}
+              onClick={signOutDuewise}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-panel/50 p-3 text-sm font-semibold text-ink/75 hover:text-ink"
             >
               <LogOut className="h-4 w-4" />

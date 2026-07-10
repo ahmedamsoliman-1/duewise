@@ -15,16 +15,11 @@ import {
 import {
   EmailAuthProvider,
   signOut,
-  TotpMultiFactorGenerator,
-  multiFactor,
   reauthenticateWithCredential,
   reload,
   updatePassword,
-  updateProfile,
-  type MultiFactorInfo,
-  type TotpSecret
+  updateProfile
 } from "firebase/auth";
-import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { Badge } from "@/components/ui/badge";
@@ -43,9 +38,8 @@ const providerLabels: Record<string, string> = {
   password: "Email & password"
 };
 
-// Generic, non-leaky fallback shown when two-factor setup can't proceed
-// (e.g. the provider isn't configured). The real reason is logged server-side.
-const MFA_UNAVAILABLE = "Two-factor setup isn't available right now. Please try again later.";
+type MfaStatusResponse = { data: { enabled: boolean; verified: boolean } };
+type MfaSetupResponse = { data: { secret: string; qrDataUrl: string; otpauthUrl: string } };
 
 export function ProfileClient() {
   const { user } = useAuth();
@@ -56,12 +50,13 @@ export function ProfileClient() {
   const [message, setMessage] = useState<Message | null>(null);
   const [busy, setBusy] = useState("");
 
-  // TOTP enrollment state
-  const [factors, setFactors] = useState<MultiFactorInfo[]>([]);
+  // App-level TOTP enrollment state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null);
+  const [totpSecret, setTotpSecret] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [enrollCode, setEnrollCode] = useState("");
+  const [removeCode, setRemoveCode] = useState("");
   const [copied, setCopied] = useState(false);
 
   const providerIds = useMemo(() => user?.providerData.map((provider) => provider.providerId) ?? [], [user]);
@@ -75,12 +70,17 @@ export function ProfileClient() {
   useEffect(() => {
     setDisplayName(user?.displayName ?? "");
     setPhotoURL(user?.photoURL ?? "");
-    if (user) setFactors(multiFactor(user).enrolledFactors);
   }, [user]);
 
-  function refreshFactors() {
-    if (user) setFactors(multiFactor(user).enrolledFactors);
+  async function refreshMfaStatus() {
+    const status = await apiFetch<MfaStatusResponse>("/api/mfa/status");
+    setMfaEnabled(status.data.enabled);
   }
+
+  useEffect(() => {
+    if (!user) return;
+    refreshMfaStatus().catch(() => undefined);
+  }, [user]);
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -130,15 +130,12 @@ export function ProfileClient() {
         const credential = EmailAuthProvider.credential(user.email, confirmPassword);
         await reauthenticateWithCredential(user, credential);
       }
-      const session = await multiFactor(user).getSession();
-      const secret = await TotpMultiFactorGenerator.generateSecret(session);
-      const url = secret.generateQrCodeUrl(user.email ?? user.uid, "Duewise");
-      const dataUrl = await QRCode.toDataURL(url, { margin: 1, width: 240, color: { dark: "#1C1712", light: "#FFFFFF" } });
-      setTotpSecret(secret);
-      setQrDataUrl(dataUrl);
+      const setup = await apiFetch<MfaSetupResponse>("/api/mfa/setup", { method: "POST" });
+      setTotpSecret(setup.data.secret);
+      setQrDataUrl(setup.data.qrDataUrl);
     } catch (error) {
       reportUnexpectedError("mfa-begin", error);
-      setMessage({ type: "error", text: friendlyAuthError(error, MFA_UNAVAILABLE) });
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Two-factor setup couldn't start. Please try again." });
     } finally {
       setBusy("");
     }
@@ -150,42 +147,46 @@ export function ProfileClient() {
     setBusy("mfa-enroll");
     setMessage(null);
     try {
-      const assertion = TotpMultiFactorGenerator.assertionForEnrollment(totpSecret, enrollCode.trim());
-      await multiFactor(user).enroll(assertion, "Authenticator app");
-      await reload(user);
+      await apiFetch("/api/mfa/verify", {
+        method: "POST",
+        body: JSON.stringify({ code: enrollCode.trim() })
+      });
       await apiFetch("/api/me", { method: "POST" }).catch(() => undefined);
-      refreshFactors();
+      setMfaEnabled(true);
       cancelEnroll();
       setConfirmPassword("");
       setMessage({ type: "success", text: "Authenticator app enabled. You'll be asked for a code at next sign-in." });
     } catch (error) {
       reportUnexpectedError("mfa-enroll", error);
-      setMessage({ type: "error", text: friendlyAuthError(error, MFA_UNAVAILABLE) });
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "We couldn't verify that code. Please try again." });
     } finally {
       setBusy("");
     }
   }
 
-  async function removeFactor(factor: MultiFactorInfo) {
+  async function removeFactor() {
     if (!user) return;
-    setBusy(`mfa-remove-${factor.uid}`);
+    setBusy("mfa-remove");
     setMessage(null);
     try {
-      await multiFactor(user).unenroll(factor);
-      await reload(user);
+      await apiFetch("/api/mfa/disable", {
+        method: "POST",
+        body: JSON.stringify({ code: removeCode.trim() })
+      });
       await apiFetch("/api/me", { method: "POST" }).catch(() => undefined);
-      refreshFactors();
+      setMfaEnabled(false);
+      setRemoveCode("");
       setMessage({ type: "success", text: "Two-factor method removed." });
     } catch (error) {
       reportUnexpectedError("mfa-remove", error);
-      setMessage({ type: "error", text: friendlyAuthError(error, MFA_UNAVAILABLE) });
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Two-factor method couldn't be removed." });
     } finally {
       setBusy("");
     }
   }
 
   function cancelEnroll() {
-    setTotpSecret(null);
+    setTotpSecret("");
     setQrDataUrl("");
     setEnrollCode("");
     setCopied(false);
@@ -193,7 +194,7 @@ export function ProfileClient() {
 
   async function copySecret() {
     if (!totpSecret) return;
-    await navigator.clipboard.writeText(totpSecret.secretKey);
+    await navigator.clipboard.writeText(totpSecret);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   }
@@ -212,6 +213,11 @@ export function ProfileClient() {
     } finally {
       setBusy("");
     }
+  }
+
+  async function signOutDuewise() {
+    await fetch("/api/mfa/session", { method: "DELETE" }).catch(() => undefined);
+    await signOut(auth);
   }
 
   const memberSince = user?.metadata.creationTime
@@ -251,7 +257,7 @@ export function ProfileClient() {
                     {providerLabels[id] ?? id}
                   </span>
                 ))}
-                {factors.length > 0 && (
+                {mfaEnabled && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-200 ring-1 ring-emerald-400/20">
                     <ShieldCheck className="h-3 w-3" />
                     2FA on
@@ -334,26 +340,30 @@ export function ProfileClient() {
             icon={<ShieldCheck className="h-5 w-5" />}
             title="Two-factor authentication"
             description="Protect sign-in with an authenticator app."
-            action={factors.length ? <Badge tone="success">On</Badge> : <Badge tone="warning">Off</Badge>}
+            action={mfaEnabled ? <Badge tone="success">On</Badge> : <Badge tone="warning">Off</Badge>}
           />
-          {factors.length > 0 && (
-            <ul className="mb-4 grid gap-2">
-              {factors.map((factor) => (
-                <li
-                  key={factor.uid}
-                  className="grid gap-2 rounded-xl border border-line bg-panel/50 px-3.5 py-2.5 sm:flex sm:items-center sm:justify-between sm:gap-3"
-                >
-                  <span className="flex min-w-0 items-center gap-2.5 text-sm">
-                    <Smartphone className="h-4 w-4 shrink-0 text-brand" />
-                    <span className="min-w-0 truncate font-medium text-ink">{factor.displayName || "Authenticator app"}</span>
-                  </span>
-                  <Button variant="ghost" size="sm" className="w-full sm:w-auto" disabled={busy === `mfa-remove-${factor.uid}`} onClick={() => removeFactor(factor)}>
-                    <Trash2 className="h-4 w-4" />
-                    Remove
-                  </Button>
-                </li>
-              ))}
-            </ul>
+          {mfaEnabled && (
+            <div className="mb-4 grid gap-3 rounded-xl border border-line bg-panel/50 p-3.5">
+              <span className="flex min-w-0 items-center gap-2.5 text-sm">
+                <Smartphone className="h-4 w-4 shrink-0 text-brand" />
+                <span className="min-w-0 truncate font-medium text-ink">Authenticator app</span>
+              </span>
+              <Label>
+                Code to remove 2FA
+                <Input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={removeCode}
+                  onChange={(event) => setRemoveCode(event.target.value.replace(/\D/g, ""))}
+                />
+              </Label>
+              <Button variant="ghost" size="sm" className="w-full sm:w-auto" disabled={busy === "mfa-remove" || removeCode.length < 6} onClick={removeFactor}>
+                <Trash2 className="h-4 w-4" />
+                Remove
+              </Button>
+            </div>
           )}
           {!totpSecret ? (
             <div className="grid gap-4">
@@ -373,7 +383,7 @@ export function ProfileClient() {
               )}
               <Button disabled={busy === "mfa-begin"} onClick={beginEnroll} className="justify-self-start">
                 <ShieldCheck className="h-4 w-4" />
-                {busy === "mfa-begin" ? "Preparing…" : factors.length ? "Add another app" : "Set up authenticator app"}
+                {busy === "mfa-begin" ? "Preparing…" : mfaEnabled ? "Replace authenticator app" : "Set up authenticator app"}
               </Button>
             </div>
           ) : (
@@ -391,7 +401,7 @@ export function ProfileClient() {
                     onClick={copySecret}
                     className="inline-flex items-center gap-2 self-start rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-ink transition hover:border-brand/40"
                   >
-                    <span className="break-all">{totpSecret.secretKey}</span>
+                    <span className="break-all">{totpSecret}</span>
                     {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-muted" />}
                   </button>
                 </div>
@@ -429,7 +439,7 @@ export function ProfileClient() {
               <Download className="h-4 w-4" />
               {busy === "export" ? "Exporting…" : "Export JSON"}
             </Button>
-            <Button variant="ghost" onClick={() => signOut(auth)}>
+            <Button variant="ghost" onClick={signOutDuewise}>
               <LogOut className="h-4 w-4" />
               Sign out
             </Button>

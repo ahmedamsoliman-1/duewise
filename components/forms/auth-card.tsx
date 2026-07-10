@@ -2,21 +2,21 @@
 
 import {
   createUserWithEmailAndPassword,
-  getMultiFactorResolver,
   signInWithEmailAndPassword,
+  signOut,
   signInWithPopup,
-  TotpMultiFactorGenerator,
   updateProfile,
-  type MultiFactorError,
-  type MultiFactorResolver
+  type User
 } from "firebase/auth";
 import { CalendarClock, FileText, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DuewiseLogo } from "@/components/ui/duewise-logo";
 import { Input, Label } from "@/components/ui/input";
 import { auth, googleProvider } from "@/lib/firebase/client";
+import { apiFetch } from "@/lib/api/client";
 import { friendlyAuthError } from "@/lib/errors/auth-messages";
 import { reportUnexpectedError } from "@/lib/observability/report";
 
@@ -26,8 +26,11 @@ const highlights = [
   { icon: ShieldCheck, title: "Yours alone", body: "Per-account isolation with optional authenticator-app 2FA." }
 ];
 
+type MfaStatusResponse = { data: { enabled: boolean; verified: boolean } };
+
 export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   const signup = mode === "signup";
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,30 +38,60 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   const [busy, setBusy] = useState<"" | "email" | "google" | "mfa">("");
 
   // Second-factor (TOTP) challenge state
-  const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [totpCode, setTotpCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
 
   function handleAuthError(nextError: unknown) {
-    if (nextError instanceof Error && "code" in nextError && (nextError as MultiFactorError).code === "auth/multi-factor-auth-required") {
-      const mfaResolver = getMultiFactorResolver(auth, nextError as MultiFactorError);
-      setResolver(mfaResolver);
-      setError("");
-      return;
-    }
     reportUnexpectedError("auth-signin", nextError);
     setError(friendlyAuthError(nextError, "We couldn't sign you in. Please try again."));
   }
+
+  const checkMfaAfterSignIn = useCallback(async (user: User) => {
+    const token = await user.getIdToken();
+    const response = await fetch("/api/mfa/status", {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (!response.ok) throw new Error("We couldn't check two-factor status. Please try again.");
+
+    const status = (await response.json()) as MfaStatusResponse;
+    if (status.data.enabled && !status.data.verified) {
+      window.sessionStorage.setItem("duewise:mfa-pending", "1");
+      setMfaRequired(true);
+      setError("");
+      return;
+    }
+
+    window.sessionStorage.removeItem("duewise:mfa-pending");
+    router.replace("/dashboard");
+  }, [router]);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || signup) return;
+    if (window.sessionStorage.getItem("duewise:mfa-pending") === "1") {
+      setMfaRequired(true);
+      return;
+    }
+    checkMfaAfterSignIn(user).catch(() => undefined);
+  }, [checkMfaAfterSignIn, signup]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy("email");
     setError("");
     try {
+      await fetch("/api/mfa/session", { method: "DELETE" }).catch(() => undefined);
       if (signup) {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         if (name) await updateProfile(credential.user, { displayName: name });
+        router.replace("/dashboard");
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        await checkMfaAfterSignIn(credential.user);
       }
     } catch (nextError) {
       handleAuthError(nextError);
@@ -71,7 +104,9 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
     setBusy("google");
     setError("");
     try {
-      await signInWithPopup(auth, googleProvider);
+      await fetch("/api/mfa/session", { method: "DELETE" }).catch(() => undefined);
+      const credential = await signInWithPopup(auth, googleProvider);
+      await checkMfaAfterSignIn(credential.user);
     } catch (nextError) {
       handleAuthError(nextError);
     } finally {
@@ -81,16 +116,18 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
 
   async function verifyTotp(event: React.FormEvent) {
     event.preventDefault();
-    if (!resolver) return;
-    const hint = resolver.hints.find((factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID) ?? resolver.hints[0];
     setBusy("mfa");
     setError("");
     try {
-      const assertion = TotpMultiFactorGenerator.assertionForSignIn(hint.uid, totpCode.trim());
-      await resolver.resolveSignIn(assertion);
+      await apiFetch("/api/mfa/verify", {
+        method: "POST",
+        body: JSON.stringify({ code: totpCode.trim(), rememberDevice })
+      });
+      window.sessionStorage.removeItem("duewise:mfa-pending");
+      router.replace("/dashboard");
     } catch (nextError) {
       reportUnexpectedError("mfa-signin", nextError);
-      setError(friendlyAuthError(nextError, "We couldn't verify that code. Please try again."));
+      setError(nextError instanceof Error ? nextError.message : "We couldn't verify that code. Please try again.");
     } finally {
       setBusy("");
     }
@@ -138,7 +175,7 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
             <DuewiseLogo />
           </div>
 
-          {resolver ? (
+          {mfaRequired ? (
             <div className="animate-rise">
               <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand">
                 <ShieldCheck className="h-6 w-6" />
@@ -161,6 +198,18 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
                     onChange={(event) => setTotpCode(event.target.value.replace(/\D/g, ""))}
                   />
                 </Label>
+                <label className="flex items-start gap-3 rounded-xl border border-line bg-panel/45 p-3 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 shrink-0 accent-brand"
+                    checked={rememberDevice}
+                    onChange={(event) => setRememberDevice(event.target.checked)}
+                  />
+                  <span>
+                    <span className="block font-semibold text-ink">Trust this device for 30 days</span>
+                    <span className="mt-0.5 block">Skip the authenticator code here unless you sign in from a new browser or device.</span>
+                  </span>
+                </label>
                 {error && <p className="rounded-xl bg-red-500/10 px-3.5 py-2.5 text-sm font-medium text-red-600 dark:text-red-300">{error}</p>}
                 <Button size="lg" type="submit" disabled={busy === "mfa" || totpCode.length < 6}>
                   {busy === "mfa" ? "Verifying…" : "Verify & sign in"}
@@ -168,9 +217,11 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setResolver(null);
+                    setMfaRequired(false);
                     setTotpCode("");
                     setError("");
+                    window.sessionStorage.removeItem("duewise:mfa-pending");
+                    void signOut(auth);
                   }}
                   className="text-sm font-medium text-muted transition-colors hover:text-ink"
                 >

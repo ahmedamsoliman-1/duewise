@@ -6,7 +6,7 @@ import { ensureUserProfile, getUserProfile } from "@/lib/firestore/users";
 /** Sync the shallow user profile document with the Firebase Auth record. */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser(request);
+    const user = await requireUser(request, { skipMfa: true });
     const profile = await ensureUserProfile(user.uid);
     return NextResponse.json({ data: profile });
   } catch (error) {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser(request);
+    const user = await requireUser(request, { skipMfa: true });
     const profile = await getUserProfile(user.uid);
     return NextResponse.json({ data: profile });
   } catch (error) {

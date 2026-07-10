@@ -18,6 +18,10 @@ function userDoc(uid: string) {
   return adminDb().collection("users").doc(uid);
 }
 
+function appMfaEnabled(docData?: FirebaseFirestore.DocumentData | null) {
+  return Boolean(docData?.mfaTotp?.enabled);
+}
+
 function toISO(value: unknown): string | null {
   if (!value) return null;
   const maybe = value as { toDate?: () => Date };
@@ -35,7 +39,7 @@ export function buildProfile(record: UserRecord, docData?: FirebaseFirestore.Doc
     photoURL: record.photoURL ?? null,
     providerIds: record.providerData.map((provider) => provider.providerId),
     emailVerified: record.emailVerified,
-    mfaEnabled: (record.multiFactor?.enrolledFactors?.length ?? 0) > 0,
+    mfaEnabled: appMfaEnabled(docData) || (record.multiFactor?.enrolledFactors?.length ?? 0) > 0,
     disabled: record.disabled,
     createdAt: record.metadata.creationTime
       ? new Date(record.metadata.creationTime).toISOString()
@@ -62,7 +66,7 @@ export async function ensureUserProfile(uid: string): Promise<UserProfile> {
     photoURL: record.photoURL ?? null,
     providerIds: record.providerData.map((provider) => provider.providerId),
     emailVerified: record.emailVerified,
-    mfaEnabled: (record.multiFactor?.enrolledFactors?.length ?? 0) > 0,
+    mfaEnabled: appMfaEnabled(snapshot.data()) || (record.multiFactor?.enrolledFactors?.length ?? 0) > 0,
     disabled: record.disabled,
     updatedAt: FieldValue.serverTimestamp(),
     lastLoginAt: FieldValue.serverTimestamp()
@@ -80,6 +84,57 @@ export async function ensureUserProfile(uid: string): Promise<UserProfile> {
 export async function getUserProfile(uid: string): Promise<UserProfile> {
   const [record, snapshot] = await Promise.all([adminAuth().getUser(uid), userDoc(uid).get()]);
   return buildProfile(record, snapshot.data());
+}
+
+export async function getUserMfaState(uid: string): Promise<{ enabled: boolean; secret: string | null; pendingSecret: string | null }> {
+  const snapshot = await userDoc(uid).get();
+  const data = snapshot.data();
+  return {
+    enabled: Boolean(data?.mfaTotp?.enabled),
+    secret: typeof data?.mfaTotp?.secret === "string" ? data.mfaTotp.secret : null,
+    pendingSecret: typeof data?.mfaTotpPending?.secret === "string" ? data.mfaTotpPending.secret : null
+  };
+}
+
+export async function setPendingTotpSecret(uid: string, secret: string) {
+  await userDoc(uid).set(
+    {
+      mfaTotpPending: {
+        secret,
+        createdAt: FieldValue.serverTimestamp()
+      },
+      updatedAt: FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+export async function enableTotpMfa(uid: string, secret: string) {
+  await userDoc(uid).set(
+    {
+      mfaEnabled: true,
+      mfaTotp: {
+        enabled: true,
+        secret,
+        enabledAt: FieldValue.serverTimestamp()
+      },
+      mfaTotpPending: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+export async function disableTotpMfa(uid: string) {
+  await userDoc(uid).set(
+    {
+      mfaEnabled: false,
+      mfaTotp: FieldValue.delete(),
+      mfaTotpPending: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
 }
 
 export async function getUserDetail(uid: string): Promise<UserDetail> {
