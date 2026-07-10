@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, CalendarDays, CreditCard, FileText, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarDays, CreditCard, FileText, Flame, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -9,9 +9,11 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api/client";
 import type { DuewiseDocument, Subscription, Task, TimelineEvent } from "@/types";
+import type { AttentionItem } from "@/lib/dates/attention";
 
 type DashboardData = {
   upcomingDeadlines: TimelineEvent[];
+  attentionItems: AttentionItem[];
   overdueTasks: Task[];
   documentsExpiringSoon: DuewiseDocument[];
   renewalsThisMonth: Subscription[];
@@ -26,6 +28,20 @@ const quickAdds = [
   ["/subscriptions", "Subscription"],
   ["/inventory", "Inventory"]
 ] as const;
+
+const severityTone: Record<AttentionItem["severity"], "danger" | "warning" | "brand" | "neutral"> = {
+  critical: "danger",
+  high: "warning",
+  medium: "brand",
+  low: "neutral"
+};
+
+const severityLabel: Record<AttentionItem["severity"], string> = {
+  critical: "Critical",
+  high: "High",
+  medium: "Watch",
+  low: "Later"
+};
 
 export function DashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -117,6 +133,59 @@ export function DashboardClient() {
               </Card>
             ))}
       </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-line bg-panel/35 p-5 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-strong">
+                <Flame className="h-4 w-4" />
+                Attention engine
+              </span>
+              <h2 className="mt-1 font-display text-xl font-extrabold text-ink">What needs your eyes first</h2>
+            </div>
+            {data?.attentionItems.length ? <Badge tone="warning">{data.attentionItems.length} signals</Badge> : null}
+          </div>
+        </div>
+        {!data ? (
+          <div className="grid gap-3 p-5 sm:p-6">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : data.attentionItems.length ? (
+          <div className="divide-y divide-line">
+            {data.attentionItems.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="group grid gap-3 p-4 transition-colors hover:bg-brand-soft/30 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
+              >
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Badge tone={severityTone[item.severity]}>{severityLabel[item.severity]}</Badge>
+                    <span className="truncate font-semibold text-ink">{item.title}</span>
+                  </span>
+                  <span className="mt-1 block text-sm text-muted">
+                    {item.reason}
+                    {item.relatedName ? ` · ${item.relatedName}` : ""}
+                  </span>
+                </span>
+                <span className="inline-flex items-center justify-between gap-3 sm:justify-end">
+                  <Badge tone={item.daysUntil < 0 ? "danger" : item.daysUntil <= 7 ? "warning" : "neutral"}>
+                    {item.dueDate}
+                  </Badge>
+                  <ArrowUpRight className="h-4 w-4 text-muted transition-colors group-hover:text-brand" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="p-5 sm:p-6">
+            <EmptyHint title="Nothing needs attention" body="No overdue, near-due, or high-importance records are asking for action." />
+          </div>
+        )}
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         {/* Upcoming */}

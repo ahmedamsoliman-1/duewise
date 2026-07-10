@@ -2,19 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { isBefore, isSameMonth, parseISO } from "date-fns";
 import { apiError } from "@/lib/api/errors";
 import { requireUser } from "@/lib/auth/server";
+import { buildAttentionItems } from "@/lib/dates/attention";
 import { isWithinDays } from "@/lib/dates/status";
 import { buildTimelineEvents, monthlySpend } from "@/lib/dates/timeline";
 import { readUserCollection } from "@/lib/firestore/readers";
-import type { DuewiseDocument, InventoryItem, LifeEvent, Subscription, Task } from "@/types";
+import type { DuewiseDocument, FamilyMember, InventoryItem, LifeEvent, Subscription, Task } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUser(request);
-    const [tasks, documents, subscriptions, inventory, lifeEvents] = await Promise.all([
+    const [tasks, documents, subscriptions, inventory, familyMembers, lifeEvents] = await Promise.all([
       readUserCollection<Task>(user.uid, "tasks"),
       readUserCollection<DuewiseDocument>(user.uid, "documents"),
       readUserCollection<Subscription>(user.uid, "subscriptions"),
       readUserCollection<InventoryItem>(user.uid, "inventory"),
+      readUserCollection<FamilyMember>(user.uid, "familyMembers"),
       readUserCollection<LifeEvent>(user.uid, "lifeEvents")
     ]);
 
@@ -29,6 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: {
         upcomingDeadlines,
+        attentionItems: buildAttentionItems({ tasks, documents, subscriptions, inventory, familyMembers, lifeEvents }),
         overdueTasks,
         documentsExpiringSoon,
         renewalsThisMonth,
