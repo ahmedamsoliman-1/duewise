@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  CheckCircle2,
   Copy,
   Download,
   Edit2,
@@ -380,6 +381,7 @@ function ResourceGridCards({
   onEdit,
   onDelete,
   onDuplicate,
+  onComplete,
   onToggleSelect,
   onDragStart,
   onDragOver,
@@ -387,7 +389,8 @@ function ResourceGridCards({
   selectedIds,
   draggingId,
   onOpenFile,
-  onDownloadFile
+  onDownloadFile,
+  showQuickComplete = false
 }: {
   items: Record<string, unknown>[];
   columns: Column[];
@@ -397,6 +400,7 @@ function ResourceGridCards({
   onEdit: (item: Record<string, unknown>) => void;
   onDelete: (id: unknown) => void;
   onDuplicate: (id: unknown) => void;
+  onComplete: (id: unknown) => void;
   onToggleSelect: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragOver: (event: React.DragEvent<HTMLElement>) => void;
@@ -405,6 +409,7 @@ function ResourceGridCards({
   draggingId?: string;
   onOpenFile: (storagePath: unknown) => void;
   onDownloadFile: (storagePath: unknown) => void;
+  showQuickComplete?: boolean;
 }) {
   const titleColumn = columns[0];
   const detailColumns = columns.filter((column) => column.key !== titleColumn.key && column.key !== "storagePath");
@@ -415,6 +420,8 @@ function ResourceGridCards({
         const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
         const previewUrl = storagePath ? previewUrls[storagePath] : "";
         const kind = storagePath ? fileKind(storagePath) : undefined;
+
+        const completed = String(item.status ?? "").toLowerCase() === "completed";
 
         return (
           <Card key={String(item.id)} className="overflow-hidden p-0" draggable onDragStart={() => onDragStart(String(item.id))} onDragOver={onDragOver} onDrop={() => onDrop(String(item.id))}>
@@ -465,6 +472,11 @@ function ResourceGridCards({
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
+                  {showQuickComplete ? (
+                    <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
+                      <CheckCircle2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                   <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => onEdit(item)} title="Edit">
                     <Edit2 className="h-4 w-4" />
                   </Button>
@@ -521,8 +533,10 @@ function TaskMobileCard({
   onEdit,
   onDelete,
   onDuplicate,
+  onComplete,
   onToggleSelect,
-  selectedIds
+  selectedIds,
+  showQuickComplete = false
 }: {
   item: Record<string, unknown>;
   columns: Column[];
@@ -530,8 +544,10 @@ function TaskMobileCard({
   onEdit: (item: Record<string, unknown>) => void;
   onDelete: (id: unknown) => void;
   onDuplicate: (id: unknown) => void;
+  onComplete: (id: unknown) => void;
   onToggleSelect: (id: string) => void;
   selectedIds: string[];
+  showQuickComplete?: boolean;
 }) {
   const titleColumn = columns[0];
   const relationByKey = Object.fromEntries(columns.filter((column) => column.relation).map((column) => [column.key, column.relation]));
@@ -543,6 +559,7 @@ function TaskMobileCard({
   const assigned = assignedRelation ? relationLabel(assignedRelation, item.familyMemberId, relationOptions) : "";
   const document = documentRelation ? relationLabel(documentRelation, item.linkedDocumentId, relationOptions) : "";
   const notes = String(item.notes ?? "").trim();
+  const completed = String(item.status ?? "").toLowerCase() === "completed";
 
   return (
     <Card className="p-4">
@@ -562,6 +579,11 @@ function TaskMobileCard({
           </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
+          {showQuickComplete ? (
+            <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
+              <CheckCircle2 className="h-4 w-4" />
+            </Button>
+          ) : null}
           <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => onEdit(item)} title="Edit">
             <Edit2 className="h-4 w-4" />
           </Button>
@@ -797,6 +819,36 @@ export function ResourcePage({
       setSelectedIds((current) => current.filter((itemId) => itemId !== id));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not delete item.");
+    }
+  }
+
+  async function completeItem(id: unknown) {
+    if (typeof id !== "string") return;
+    const target = items.find((item) => String(item.id) === id);
+    if (target && String(target.status ?? "").toLowerCase() === "completed") return;
+    setError("");
+    try {
+      const response = await apiFetch<ApiItem>(endpoint, {
+        method: "PATCH",
+        body: JSON.stringify({ id, status: "completed" })
+      });
+      setItems((current) => current.map((item) => (String(item.id) === id ? response.data : item)));
+      setSelectedIds((current) => current.filter((itemId) => itemId !== id));
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not complete item.");
+    }
+  }
+
+  async function completeSelected() {
+    if (selectedIds.length === 0 || endpoint !== "/api/tasks") return;
+    setError("");
+    try {
+      const responses = await Promise.all(selectedIds.map((id) => apiFetch<ApiItem>(endpoint, { method: "PATCH", body: JSON.stringify({ id, status: "completed" }) })));
+      const updated = Object.fromEntries(responses.map((response) => [String(response.data.id), response.data]));
+      setItems((current) => current.map((item) => updated[String(item.id)] ?? item));
+      setSelectedIds([]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not complete selected items.");
     }
   }
 
@@ -1151,6 +1203,9 @@ export function ResourcePage({
       {!formOpen && selectedIds.length > 0 && (
         <Card className="flex flex-wrap items-center gap-3 p-3 sm:p-4">
           <span className="text-sm font-semibold text-ink">{selectedIds.length} selected</span>
+          {endpoint === "/api/tasks" ? (
+            <Button type="button" variant="secondary" size="sm" onClick={completeSelected}>Complete selected</Button>
+          ) : null}
           <Button type="button" variant="secondary" size="sm" onClick={bulkDelete}>Delete selected</Button>
           <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Clear</Button>
         </Card>
@@ -1210,6 +1265,7 @@ export function ResourcePage({
               onEdit={startEdit}
               onDelete={remove}
               onDuplicate={duplicate}
+              onComplete={completeItem}
               onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id])}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
@@ -1218,6 +1274,7 @@ export function ResourcePage({
               draggingId={draggingId}
               onOpenFile={openStoredFile}
               onDownloadFile={downloadStoredFile}
+              showQuickComplete={endpoint === "/api/tasks"}
             />
           ) : null}
 
@@ -1233,8 +1290,10 @@ export function ResourcePage({
                   onEdit={startEdit}
                   onDelete={remove}
                   onDuplicate={duplicate}
+                  onComplete={completeItem}
                   onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id])}
                   selectedIds={selectedIds}
+                  showQuickComplete={endpoint === "/api/tasks"}
                 />
               ) : (
                 <Card key={String(item.id)} className="p-4">
@@ -1300,6 +1359,11 @@ export function ResourcePage({
                       ))}
                       <td className="px-5 py-3.5">
                         <div className="flex justify-end gap-1.5">
+                          {endpoint === "/api/tasks" ? (
+                            <Button variant="secondary" size="icon" className="h-9 w-9" disabled={String(item.status ?? "").toLowerCase() === "completed"} onClick={() => completeItem(item.id)} title={String(item.status ?? "").toLowerCase() === "completed" ? "Completed" : "Complete"}>
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          ) : null}
                           <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => startEdit(item)} title="Edit">
                             <Edit2 className="h-4 w-4" />
                           </Button>
