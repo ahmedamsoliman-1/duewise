@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Copy,
   Download,
   Edit2,
   ExternalLink,
@@ -9,6 +10,8 @@ import {
   Grid2X2,
   Inbox,
   List,
+  MoveDown,
+  MoveUp,
   Plus,
   Search,
   Trash2,
@@ -27,6 +30,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api/client";
 import { SELF_FAMILY_MEMBER_ID, SELF_FAMILY_MEMBER_LABEL } from "@/lib/family/self";
+import { reorderItems, sortItemsByPosition } from "@/lib/utils/ordering";
 
 type Field = {
   name: string;
@@ -134,6 +138,12 @@ function filterMatches(filter: QuickFilter, item: Record<string, unknown>) {
   if (filter.value === "") return !value;
   if (Array.isArray(value)) return value.map(String).includes(String(filter.value));
   return String(value ?? "") === String(filter.value ?? "");
+}
+
+function buildCopyLabel(item: Record<string, unknown>) {
+  if (typeof item.title === "string" && item.title.trim()) return `${item.title.trim()} (copy)`;
+  if (typeof item.name === "string" && item.name.trim()) return `${item.name.trim()} (copy)`;
+  return "Copy";
 }
 
 function renderCell(
@@ -369,6 +379,13 @@ function ResourceGridCards({
   openingPath,
   onEdit,
   onDelete,
+  onDuplicate,
+  onToggleSelect,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  selectedIds,
+  draggingId,
   onOpenFile,
   onDownloadFile
 }: {
@@ -379,6 +396,13 @@ function ResourceGridCards({
   openingPath: string;
   onEdit: (item: Record<string, unknown>) => void;
   onDelete: (id: unknown) => void;
+  onDuplicate: (id: unknown) => void;
+  onToggleSelect: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onDragOver: (event: React.DragEvent<HTMLElement>) => void;
+  onDrop: (targetId: string) => void;
+  selectedIds: string[];
+  draggingId?: string;
   onOpenFile: (storagePath: unknown) => void;
   onDownloadFile: (storagePath: unknown) => void;
 }) {
@@ -393,7 +417,16 @@ function ResourceGridCards({
         const kind = storagePath ? fileKind(storagePath) : undefined;
 
         return (
-          <Card key={String(item.id)} className="overflow-hidden p-0">
+          <Card key={String(item.id)} className="overflow-hidden p-0" draggable onDragStart={() => onDragStart(String(item.id))} onDragOver={onDragOver} onDrop={() => onDrop(String(item.id))}>
+            <div className="flex items-center justify-between border-b border-line bg-panel/40 px-3 py-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-ink/70">
+                <input type="checkbox" checked={selectedIds.includes(String(item.id))} onChange={() => onToggleSelect(String(item.id))} />
+                Select
+              </label>
+              <span className={`text-[11px] font-semibold uppercase tracking-wide ${draggingId === String(item.id) ? "text-brand" : "text-muted"}`}>
+                {draggingId === String(item.id) ? "Moving" : "Drag"}
+              </span>
+            </div>
             <button
               type="button"
               className="relative block aspect-[4/3] w-full overflow-hidden bg-panel text-left"
@@ -437,6 +470,9 @@ function ResourceGridCards({
                   </Button>
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDelete(item.id)} title="Delete">
                     <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDuplicate(item.id)} title="Duplicate">
+                    <Copy className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -483,13 +519,19 @@ function TaskMobileCard({
   columns,
   relationOptions,
   onEdit,
-  onDelete
+  onDelete,
+  onDuplicate,
+  onToggleSelect,
+  selectedIds
 }: {
   item: Record<string, unknown>;
   columns: Column[];
   relationOptions: Record<string, Record<string, string>>;
   onEdit: (item: Record<string, unknown>) => void;
   onDelete: (id: unknown) => void;
+  onDuplicate: (id: unknown) => void;
+  onToggleSelect: (id: string) => void;
+  selectedIds: string[];
 }) {
   const titleColumn = columns[0];
   const relationByKey = Object.fromEntries(columns.filter((column) => column.relation).map((column) => [column.key, column.relation]));
@@ -505,7 +547,11 @@ function TaskMobileCard({
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+          <label className="mb-2 flex items-center gap-2 text-sm font-medium text-ink/70">
+            <input type="checkbox" checked={selectedIds.includes(String(item.id))} onChange={() => onToggleSelect(String(item.id))} />
+            Select
+          </label>
           <h2 className="font-display text-lg font-extrabold leading-tight text-ink">
             {String(item[titleColumn.key] ?? "Untitled task")}
           </h2>
@@ -521,6 +567,9 @@ function TaskMobileCard({
           </Button>
           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDelete(item.id)} title="Delete">
             <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDuplicate(item.id)} title="Duplicate">
+            <Copy className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -578,6 +627,8 @@ export function ResourcePage({
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [listView, setListView] = useState<"grid" | "table">(preferredListView ?? "table");
   const [activeFilter, setActiveFilter] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [draggingId, setDraggingId] = useState<string>();
   const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
     defaultValues: defaults
@@ -594,11 +645,13 @@ export function ResourcePage({
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
     const selected = quickFilters.find((filter) => filter.label === activeFilter);
-    return items.filter((item) => {
-      const matchesSearch = JSON.stringify(item).toLowerCase().includes(needle);
-      const matchesFilter = selected ? filterMatches(selected, item) : true;
-      return matchesSearch && matchesFilter;
-    });
+    return sortItemsByPosition(
+      items.filter((item) => {
+        const matchesSearch = JSON.stringify(item).toLowerCase().includes(needle);
+        const matchesFilter = selected ? filterMatches(selected, item) : true;
+        return matchesSearch && matchesFilter;
+      }) as Array<Record<string, unknown> & { id: string }>
+    ) as Record<string, unknown>[];
   }, [activeFilter, items, query, quickFilters]);
 
   const filterCounts = useMemo(
@@ -608,7 +661,7 @@ export function ResourcePage({
 
   const previewPathKey = useMemo(() => {
     const paths = filtered
-      .map((item) => item.storagePath)
+      .map((item) => (item as Record<string, unknown>).storagePath)
       .filter((value): value is string => typeof value === "string" && isPreviewableImage(value))
       .sort();
     return JSON.stringify(paths);
@@ -741,9 +794,61 @@ export function ResourcePage({
     try {
       await apiFetch(`${endpoint}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       setItems((current) => current.filter((item) => item.id !== id));
+      setSelectedIds((current) => current.filter((itemId) => itemId !== id));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not delete item.");
     }
+  }
+
+  async function duplicate(id: unknown) {
+    if (typeof id !== "string") return;
+    const source = items.find((item) => item.id === id);
+    if (!source) return;
+    setError("");
+    try {
+      const duplicatePayload = { ...source, id: undefined, createdAt: undefined, updatedAt: undefined, title: `${String(source.title ?? source.name ?? "Copy") } (copy)` };
+      const response = await apiFetch<ApiItem>(endpoint, {
+        method: "POST",
+        body: JSON.stringify(duplicatePayload)
+      });
+      setItems((current) => [...current, response.data]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not duplicate item.");
+    }
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.length === 0) return;
+    setError("");
+    try {
+      await Promise.all(selectedIds.map((id) => apiFetch(`${endpoint}?id=${encodeURIComponent(id)}`, { method: "DELETE" })));
+      setItems((current) => current.filter((item) => !selectedIds.includes(String(item.id))));
+      setSelectedIds([]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not delete selected items.");
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id]));
+  }
+
+  function handleDragStart(id: string) {
+    setDraggingId(id);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLElement>) {
+    event.preventDefault();
+  }
+
+  function handleDrop(targetId: string) {
+    if (!draggingId || draggingId === targetId) {
+      setDraggingId(undefined);
+      return;
+    }
+    const nextItems = reorderItems(items as Array<Record<string, unknown> & { id: string }>, draggingId, targetId);
+    setItems(nextItems as Record<string, unknown>[]);
+    setDraggingId(undefined);
   }
 
   async function uploadFile(field: Field, file: File | undefined) {
@@ -1043,6 +1148,14 @@ export function ResourcePage({
         </Card>
       )}
 
+      {!formOpen && selectedIds.length > 0 && (
+        <Card className="flex flex-wrap items-center gap-3 p-3 sm:p-4">
+          <span className="text-sm font-semibold text-ink">{selectedIds.length} selected</span>
+          <Button type="button" variant="secondary" size="sm" onClick={bulkDelete}>Delete selected</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Clear</Button>
+        </Card>
+      )}
+
       {visualMode === "familyTree" && !loading && (
         <FamilyTreePreview items={filtered} onEdit={startEdit} />
       )}
@@ -1096,6 +1209,13 @@ export function ResourcePage({
               openingPath={openingPath}
               onEdit={startEdit}
               onDelete={remove}
+              onDuplicate={duplicate}
+              onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id])}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              selectedIds={selectedIds}
+              draggingId={draggingId}
               onOpenFile={openStoredFile}
               onDownloadFile={downloadStoredFile}
             />
@@ -1112,11 +1232,18 @@ export function ResourcePage({
                   relationOptions={relationOptions}
                   onEdit={startEdit}
                   onDelete={remove}
+                  onDuplicate={duplicate}
+                  onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id])}
+                  selectedIds={selectedIds}
                 />
               ) : (
                 <Card key={String(item.id)} className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-ink/70">
+                        <input type="checkbox" checked={selectedIds.includes(String(item.id))} onChange={() => setSelectedIds((current) => current.includes(String(item.id)) ? current.filter((itemId) => itemId !== String(item.id)) : [...current, String(item.id)])} />
+                        Select
+                      </label>
                       <p className="truncate font-semibold text-ink">{String(item[columns[0].key] ?? "—")}</p>
                     </div>
                     <div className="flex shrink-0 gap-1.5">
@@ -1125,6 +1252,9 @@ export function ResourcePage({
                       </Button>
                       <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => remove(item.id)} title="Delete">
                         <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => duplicate(item.id)} title="Duplicate">
+                        <Copy className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -1175,6 +1305,12 @@ export function ResourcePage({
                           </Button>
                           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => remove(item.id)} title="Delete">
                             <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => duplicate(item.id)} title="Duplicate">
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSelectedIds((current) => current.includes(String(item.id)) ? current.filter((itemId) => itemId !== String(item.id)) : [...current, String(item.id)] )} title="Select">
+                            <input type="checkbox" checked={selectedIds.includes(String(item.id))} readOnly className="pointer-events-none h-4 w-4" />
                           </Button>
                         </div>
                       </td>

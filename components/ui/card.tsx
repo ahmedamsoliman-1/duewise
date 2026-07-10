@@ -3,15 +3,23 @@ import { cn } from "@/lib/utils";
 type CardProps = {
   className?: string;
   children: React.ReactNode;
+  draggable?: boolean;
+  onDragStart?: (event: React.DragEvent<HTMLElement>) => void;
+  onDragOver?: (event: React.DragEvent<HTMLElement>) => void;
+  onDrop?: (event: React.DragEvent<HTMLElement>) => void;
 };
 
-export function Card({ className, children }: CardProps) {
+export function Card({ className, children, draggable, onDragStart, onDragOver, onDrop }: CardProps) {
   return (
     <section
       className={cn(
         "min-w-0 rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6",
         className
       )}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       {children}
     </section>
