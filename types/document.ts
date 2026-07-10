@@ -5,6 +5,7 @@ export type DuewiseDocument = {
   ownerName: string;
   fileUrl?: string;
   storagePath?: string;
+  issueDate?: string;
   expiryDate?: string;
   tags: string[];
   notes?: string;

@@ -71,10 +71,10 @@ export default function DocumentsPage() {
   return (
     <ResourcePage
       title="Documents"
-      description="Keep important document metadata, expiry dates, storage paths, and private links in one vault."
+      description="Keep issue dates, optional expiries, storage paths, and private links in one vault."
       endpoint="/api/documents"
       schema={documentSchema}
-      defaults={{ title: "", type: "Passport", ownerName: "", fileUrl: "", storagePath: "", expiryDate: "", tags: "", notes: "", familyMemberId: "" }}
+      defaults={{ title: "", type: "Passport", ownerName: "", fileUrl: "", storagePath: "", issueDate: "", expiryDate: "", tags: "", notes: "", familyMemberId: "" }}
       fields={[
         { name: "title", label: "Title", placeholder: "Passport scan" },
         { name: "type", label: "Type", type: "select", options: ["Passport", "ID", "Visa", "Lease", "Insurance policy", "Medical record", "Receipt", "Warranty", "Contract", "Certificate"] },
@@ -85,7 +85,8 @@ export default function DocumentsPage() {
           type: "relation",
           relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned", includeSelf: true }
         },
-        { name: "expiryDate", label: "Expiry date", type: "date" },
+        { name: "issueDate", label: "Issue date", type: "date" },
+        { name: "expiryDate", label: "Expiry date optional", type: "date" },
         {
           name: "fileUpload",
           label: "File",
@@ -106,6 +107,7 @@ export default function DocumentsPage() {
         { key: "type", label: "Type" },
         { key: "ownerName", label: "Owner" },
         { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name", includeSelf: true } },
+        { key: "issueDate", label: "Issued" },
         { key: "expiryDate", label: "Expiry" },
         { key: "storagePath", label: "File", format: (value) => (value ? "Uploaded" : "—") },
         { key: "tags", label: "Tags", format: (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? "-")) }

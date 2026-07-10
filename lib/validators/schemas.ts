@@ -24,6 +24,7 @@ export const documentSchema = z.object({
   ownerName: z.string().trim().min(1),
   fileUrl: optionalFileRef,
   storagePath: optionalText,
+  issueDate: optionalDate,
   expiryDate: optionalDate,
   tags: z.preprocess(
     (value) =>

@@ -27,6 +27,7 @@ export const demoData = {
       title: "Apartment lease",
       type: "Lease",
       ownerName: "Household",
+      issueDate: date(-290),
       expiryDate: date(75),
       tags: ["home", "contract"],
       notes: "Stored copy for renewal review."

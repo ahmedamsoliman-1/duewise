@@ -64,6 +64,14 @@ type ResourceTemplate = {
   values: Record<string, unknown>;
 };
 
+type QuickFilter = {
+  label: string;
+  key: string;
+  value?: string;
+  relation?: RelationConfig;
+  predicate?: (item: Record<string, unknown>) => boolean;
+};
+
 type ResourcePageProps = {
   title: string;
   description: string;
@@ -78,6 +86,7 @@ type ResourcePageProps = {
   prepareSubmit?: (values: Record<string, unknown>) => Record<string, unknown>;
   visualMode?: "familyTree";
   preferredListView?: "grid" | "table";
+  quickFilters?: QuickFilter[];
 };
 
 type ApiList = { data: Record<string, unknown>[] };
@@ -103,6 +112,14 @@ function relationLabel(config: RelationConfig, value: unknown, relationOptions: 
   if (!value || typeof value !== "string") return "—";
   if (config.includeSelf && value === SELF_FAMILY_MEMBER_ID) return SELF_FAMILY_MEMBER_LABEL;
   return relationOptions[config.endpoint]?.[value] ?? value;
+}
+
+function filterMatches(filter: QuickFilter, item: Record<string, unknown>) {
+  if (filter.predicate) return filter.predicate(item);
+  const value = item[filter.key];
+  if (filter.value === "") return !value;
+  if (Array.isArray(value)) return value.map(String).includes(String(filter.value));
+  return String(value ?? "") === String(filter.value ?? "");
 }
 
 function renderCell(

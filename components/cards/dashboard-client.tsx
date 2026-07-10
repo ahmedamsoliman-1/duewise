@@ -252,7 +252,7 @@ export function DashboardClient() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
-          <h2 className="mb-4 font-display text-lg font-bold text-ink">Documents expiring soon</h2>
+          <h2 className="mb-4 font-display text-lg font-bold text-ink">Documents with expiries soon</h2>
           {!data ? (
             <Skeleton className="h-24 w-full rounded-xl" />
           ) : data.documentsExpiringSoon.length ? (
@@ -265,7 +265,7 @@ export function DashboardClient() {
               ))}
             </ul>
           ) : (
-            <EmptyHint title="All clear" body="No document expiries in the next 60 days." />
+            <EmptyHint title="All clear" body="No documents with expiry dates are due in the next 60 days." />
           )}
         </Card>
         <Card>
