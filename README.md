@@ -72,7 +72,25 @@ For free scheduled delivery, create a cron-job.org job that calls:
 https://YOUR_DOMAIN/api/cron/notifications?secret=YOUR_CRON_SECRET
 ```
 
-Run it once per day. The endpoint sends at most one attention digest push per user per day and records delivery under `notificationDeliveries` to avoid duplicates.
+Run it once per day. If you prefer headers in cron-job.org, use:
+
+```text
+Authorization: Bearer YOUR_CRON_SECRET
+```
+
+or:
+
+```text
+X-Cron-Secret: YOUR_CRON_SECRET
+```
+
+The endpoint also accepts `POST` JSON:
+
+```json
+{ "secret": "YOUR_CRON_SECRET" }
+```
+
+The endpoint sends at most one attention digest push per user per day and records delivery under `notificationDeliveries` to avoid duplicates.
 
 ## Firebase Data Model
 

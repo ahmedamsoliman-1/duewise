@@ -1,5 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { buildAttentionItems } from "@/lib/dates/attention";
 import { adminDb, adminMessaging } from "@/lib/firebase/admin";
 import { readUserCollection } from "@/lib/firestore/readers";
@@ -15,16 +16,47 @@ type NotificationSettings = {
   dailyDigestEnabled?: boolean;
 };
 
+const cronBodySchema = z.object({
+  secret: z.string().optional()
+});
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function authorized(request: NextRequest) {
+async function cronSecretFromRequest(request: NextRequest) {
+  const auth = request.headers.get("authorization");
+  const bearerSecret = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length) : undefined;
+  const headerSecret = request.headers.get("x-cron-secret") ?? undefined;
+  const urlSecret = new URL(request.url).searchParams.get("secret") ?? undefined;
+  const bodySecret =
+    request.method === "POST"
+      ? cronBodySchema.safeParse(await request.json().catch(() => ({}))).data?.secret
+      : undefined;
+
+  return bearerSecret ?? headerSecret ?? urlSecret ?? bodySecret;
+}
+
+async function authorizeCron(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const header = request.headers.get("authorization");
-  const urlSecret = new URL(request.url).searchParams.get("secret");
-  return header === `Bearer ${secret}` || urlSecret === secret;
+  if (!secret) {
+    return { ok: false, status: 500, error: "CRON_SECRET is not configured on the server." };
+  }
+
+  const provided = await cronSecretFromRequest(request);
+  if (!provided) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Missing cron secret. Use ?secret=..., Authorization: Bearer ..., X-Cron-Secret, or POST JSON body."
+    };
+  }
+
+  if (provided !== secret) {
+    return { ok: false, status: 401, error: "Invalid cron secret." };
+  }
+
+  return { ok: true };
 }
 
 async function userAttention(uid: string) {
@@ -42,11 +74,7 @@ async function userAttention(uid: string) {
   );
 }
 
-export async function GET(request: NextRequest) {
-  if (!authorized(request)) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
-
+async function runNotifications() {
   const day = todayKey();
   const users = await adminDb().collection("users").get();
   let checked = 0;
@@ -112,4 +140,16 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, checked, sent, skipped });
+}
+
+export async function GET(request: NextRequest) {
+  const auth = await authorizeCron(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  return runNotifications();
+}
+
+export async function POST(request: NextRequest) {
+  const auth = await authorizeCron(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  return runNotifications();
 }
