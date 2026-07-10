@@ -4,7 +4,6 @@ import { ResourcePage } from "@/components/tables/resource-page";
 import { subscriptionSchema } from "@/lib/validators/schemas";
 
 function prepareSubscription(values: Record<string, unknown>) {
-  const nextBillingDate = typeof values.nextBillingDate === "string" ? values.nextBillingDate : "";
   const recurrenceInterval = typeof values.recurrenceInterval === "string" ? values.recurrenceInterval : "none";
   const recurrenceEndDate = typeof values.recurrenceEndDate === "string" ? values.recurrenceEndDate : "";
 

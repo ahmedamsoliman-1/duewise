@@ -6,20 +6,25 @@ import { z } from "zod";
 import { makeCrudHandlers } from "@/lib/api/crud";
 import { apiError } from "@/lib/api/errors";
 import { requireUser } from "@/lib/auth/server";
-import { nextOccurrenceDate, shouldCreateNextOccurrence } from "@/lib/dates/recurring";
+import { nextOccurrenceDate, shouldCreateNextOccurrence, type RecurrenceInterval } from "@/lib/dates/recurring";
 import { userCollection } from "@/lib/firestore/collections";
 import { taskSchema } from "@/lib/validators/schemas";
 
 const handlers = makeCrudHandlers({ collection: "tasks", schema: taskSchema, orderBy: "dueDate" });
+const recurrenceIntervals = new Set<RecurrenceInterval>(["none", "weekly", "monthly", "yearly"]);
+
+function recurrenceInterval(value: unknown): RecurrenceInterval {
+  return typeof value === "string" && recurrenceIntervals.has(value as RecurrenceInterval) ? (value as RecurrenceInterval) : "none";
+}
 
 async function createNextTaskOccurrence(userId: string, current: Record<string, unknown>) {
   if (typeof current.id !== "string") return;
   if (typeof current.dueDate !== "string" || typeof current.title !== "string") return;
-  const recurrenceInterval = typeof current.recurrenceInterval === "string" ? current.recurrenceInterval : "none";
+  const interval = recurrenceInterval(current.recurrenceInterval);
   const recurrenceEndDate = typeof current.recurrenceEndDate === "string" ? current.recurrenceEndDate : undefined;
-  if (!shouldCreateNextOccurrence(current.dueDate, recurrenceInterval as any, recurrenceEndDate)) return;
+  if (!shouldCreateNextOccurrence(current.dueDate, interval, recurrenceEndDate)) return;
 
-  const nextDueDate = nextOccurrenceDate(current.dueDate, recurrenceInterval as any);
+  const nextDueDate = nextOccurrenceDate(current.dueDate, interval);
   const ref = await userCollection(userId, "tasks").add({
     ...current,
     title: current.title,
@@ -38,7 +43,8 @@ async function patchTask(request: NextRequest) {
     const body = await request.json();
     const id = z.string().min(1).parse(body.id);
     const payload = taskSchema.partial().parse(body) as Record<string, unknown>;
-    const { id: _id, ...rest } = payload;
+    const rest = { ...payload };
+    delete rest.id;
     const ref = userCollection(user.uid, "tasks").doc(id);
     const currentDoc = await ref.get();
     const currentData = currentDoc.data();

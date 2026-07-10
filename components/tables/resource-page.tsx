@@ -11,8 +11,6 @@ import {
   Grid2X2,
   Inbox,
   List,
-  MoveDown,
-  MoveUp,
   Plus,
   Search,
   Trash2,
@@ -905,7 +903,7 @@ export function ResourcePage({
     if (!source) return;
     setError("");
     try {
-      const duplicatePayload = { ...source, id: undefined, createdAt: undefined, updatedAt: undefined, title: `${String(source.title ?? source.name ?? "Copy") } (copy)` };
+      const duplicatePayload = { ...source, id: undefined, createdAt: undefined, updatedAt: undefined, title: buildCopyLabel(source) };
       const response = await apiFetch<ApiItem>(endpoint, {
         method: "POST",
         body: JSON.stringify(duplicatePayload)
@@ -1349,7 +1347,7 @@ export function ResourcePage({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <label className="mb-2 flex items-center gap-2 text-sm font-medium text-ink/70">
-                        <input type="checkbox" checked={selectedIds.includes(String(item.id))} onChange={() => setSelectedIds((current) => current.includes(String(item.id)) ? current.filter((itemId) => itemId !== String(item.id)) : [...current, String(item.id)])} />
+                        <input type="checkbox" checked={selectedIds.includes(String(item.id))} onChange={() => toggleSelect(String(item.id))} />
                         Select
                       </label>
                       <p className="truncate font-semibold text-ink">{String(item[columns[0].key] ?? "—")}</p>
