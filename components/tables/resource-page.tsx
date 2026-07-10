@@ -87,6 +87,7 @@ type ResourcePageProps = {
   prepareSubmit?: (values: Record<string, unknown>) => Record<string, unknown>;
   visualMode?: "familyTree";
   preferredListView?: "grid" | "table";
+  mobileCardVariant?: "tasks";
   quickFilters?: QuickFilter[];
 };
 
@@ -477,6 +478,76 @@ function ResourceGridCards({
   );
 }
 
+function TaskMobileCard({
+  item,
+  columns,
+  relationOptions,
+  onEdit,
+  onDelete
+}: {
+  item: Record<string, unknown>;
+  columns: Column[];
+  relationOptions: Record<string, Record<string, string>>;
+  onEdit: (item: Record<string, unknown>) => void;
+  onDelete: (id: unknown) => void;
+}) {
+  const titleColumn = columns[0];
+  const relationByKey = Object.fromEntries(columns.filter((column) => column.relation).map((column) => [column.key, column.relation]));
+  const status = String(item.status ?? "");
+  const dueDate = String(item.dueDate ?? "");
+  const category = String(item.category ?? "");
+  const assignedRelation = relationByKey.familyMemberId;
+  const documentRelation = relationByKey.linkedDocumentId;
+  const assigned = assignedRelation ? relationLabel(assignedRelation, item.familyMemberId, relationOptions) : "";
+  const document = documentRelation ? relationLabel(documentRelation, item.linkedDocumentId, relationOptions) : "";
+  const notes = String(item.notes ?? "").trim();
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-extrabold leading-tight text-ink">
+            {String(item[titleColumn.key] ?? "Untitled task")}
+          </h2>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {status ? <Badge tone={statusTone(status)}>{status}</Badge> : null}
+            {dueDate ? <Badge tone="warning">Due {dueDate}</Badge> : null}
+            {category ? <Badge tone="neutral">{category}</Badge> : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => onEdit(item)} title="Edit">
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDelete(item.id)} title="Delete">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 text-sm">
+        {assigned && assigned !== "—" ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-panel/45 px-3 py-2">
+            <span className="text-muted">Assigned</span>
+            <span className="min-w-0 truncate text-right font-semibold text-ink/85">{assigned}</span>
+          </div>
+        ) : null}
+        {document && document !== "—" ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-panel/45 px-3 py-2">
+            <span className="text-muted">Document</span>
+            <span className="min-w-0 truncate text-right font-semibold text-ink/85">{document}</span>
+          </div>
+        ) : null}
+        {notes ? (
+          <p className="max-h-16 overflow-hidden rounded-xl bg-panel/45 px-3 py-2 leading-relaxed text-ink/75">
+            {notes}
+          </p>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
 export function ResourcePage({
   title,
   description,
@@ -491,6 +562,7 @@ export function ResourcePage({
   prepareSubmit,
   visualMode,
   preferredListView,
+  mobileCardVariant,
   quickFilters = []
 }: ResourcePageProps) {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
@@ -752,8 +824,8 @@ export function ResourcePage({
   const singular = title.toLowerCase().replace(/s$/, "");
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6 overflow-hidden">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-6 overflow-hidden">
+      <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink">{title}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
@@ -803,16 +875,16 @@ export function ResourcePage({
             title="Quick starts"
             description={`Choose a common ${singular} template, then adjust the details before saving.`}
           />
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
             {templates.map((template) => (
               <button
                 key={template.title}
                 type="button"
                 onClick={() => applyTemplate(template)}
-                className="rounded-2xl border border-line bg-panel/35 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand-soft/35"
+                className="rounded-2xl border border-line bg-panel/35 p-3 text-left transition-colors hover:border-brand/30 hover:bg-brand-soft/35 sm:p-4"
               >
-                <span className="block font-semibold text-ink">{template.title}</span>
-                <span className="mt-1 block text-sm text-muted">{template.description}</span>
+                <span className="block text-sm font-semibold text-ink sm:text-base">{template.title}</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted sm:text-sm">{template.description}</span>
               </button>
             ))}
           </div>
@@ -941,7 +1013,7 @@ export function ResourcePage({
 
       {!formOpen && quickFilters.length > 0 && (
         <Card className="p-3 sm:p-4">
-          <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+          <div className="flex max-w-full flex-wrap gap-2">
             <button
               type="button"
               className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition-colors ${
@@ -1032,31 +1104,42 @@ export function ResourcePage({
           {/* Mobile cards */}
           <div className={`grid min-w-0 gap-3 md:hidden ${preferredListView && listView === "grid" ? "hidden" : ""}`}>
             {filtered.map((item) => (
-              <Card key={String(item.id)} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-ink">{String(item[columns[0].key] ?? "—")}</p>
-                  </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => startEdit(item)} title="Edit">
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => remove(item.id)} title="Delete">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <dl className="mt-3 grid gap-1.5 text-sm">
-                  {columns.slice(1).map((column) => (
-                    <div key={column.key} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-                      <dt className="shrink-0 text-muted">{column.label}</dt>
-                      <dd className="min-w-0 overflow-hidden break-words text-right font-medium text-ink/85">
-                        {renderCell(column, item, relationOptions, openStoredFile, downloadStoredFile, openingPath, downloadingPath, previewUrls)}
-                      </dd>
+              mobileCardVariant === "tasks" ? (
+                <TaskMobileCard
+                  key={String(item.id)}
+                  item={item}
+                  columns={columns}
+                  relationOptions={relationOptions}
+                  onEdit={startEdit}
+                  onDelete={remove}
+                />
+              ) : (
+                <Card key={String(item.id)} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink">{String(item[columns[0].key] ?? "—")}</p>
                     </div>
-                  ))}
-                </dl>
-              </Card>
+                    <div className="flex shrink-0 gap-1.5">
+                      <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => startEdit(item)} title="Edit">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => remove(item.id)} title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <dl className="mt-3 grid gap-1.5 text-sm">
+                    {columns.slice(1).map((column) => (
+                      <div key={column.key} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+                        <dt className="shrink-0 text-muted">{column.label}</dt>
+                        <dd className="min-w-0 overflow-hidden break-words text-right font-medium text-ink/85">
+                          {renderCell(column, item, relationOptions, openStoredFile, downloadStoredFile, openingPath, downloadingPath, previewUrls)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </Card>
+              )
             ))}
           </div>
 

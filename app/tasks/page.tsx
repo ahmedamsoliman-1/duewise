@@ -145,6 +145,7 @@ export default function TasksPage() {
       emptyBody="Add passports, registrations, insurance renewals, bills, appointments, and anything else Future You should not have to remember manually."
       templates={taskTemplates}
       prepareSubmit={prepareTask}
+      mobileCardVariant="tasks"
       quickFilters={[
         { label: "Due soon", key: "status", value: "due soon" },
         { label: "Overdue", key: "status", value: "overdue" },
