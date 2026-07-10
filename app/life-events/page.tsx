@@ -136,10 +136,15 @@ export default function LifeEventsPage() {
         { name: "date", label: "Date", type: "date" },
         { name: "endDate", label: "End date", type: "date" },
         { name: "personName", label: "Person", placeholder: "Optional name" },
+        {
+          name: "familyMemberId",
+          label: "Linked family member",
+          type: "relation",
+          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "No linked family member" }
+        },
         { name: "location", label: "Location", placeholder: "City, country, venue" },
         { name: "importance", label: "Importance", type: "select", options: ["low", "medium", "high", "landmark"] },
         { name: "privacy", label: "Privacy", type: "select", options: ["normal", "sensitive"] },
-        { name: "familyMemberId", label: "Family member ID", placeholder: "Optional" },
         { name: "notes", label: "Story / notes", type: "textarea", placeholder: "What happened, why it mattered, or what to remember" }
       ]}
       columns={[
@@ -147,6 +152,7 @@ export default function LifeEventsPage() {
         { key: "type", label: "Type" },
         { key: "date", label: "Date" },
         { key: "personName", label: "Person" },
+        { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name" } },
         { key: "location", label: "Location" },
         { key: "importance", label: "Importance" }
       ]}

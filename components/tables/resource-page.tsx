@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Edit2, Inbox, Plus, Search, Trash2, X } from "lucide-react";
+import { Edit2, Inbox, Plus, Search, Trash2, UploadCloud, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,15 +14,31 @@ import { apiFetch } from "@/lib/api/client";
 type Field = {
   name: string;
   label: string;
-  type?: "text" | "date" | "number" | "textarea" | "select" | "url";
+  type?: "text" | "date" | "number" | "textarea" | "select" | "url" | "relation" | "file";
   options?: string[];
+  relation?: RelationConfig;
+  upload?: UploadConfig;
   placeholder?: string;
+};
+
+type RelationConfig = {
+  endpoint: string;
+  labelKey: string;
+  emptyLabel?: string;
+};
+
+type UploadConfig = {
+  endpoint: string;
+  storagePathField: string;
+  urlField: string;
+  accept?: string;
 };
 
 type Column = {
   key: string;
   label: string;
   format?: (value: unknown, row: Record<string, unknown>) => string;
+  relation?: RelationConfig;
 };
 
 type ResourceTemplate = {
@@ -47,9 +63,27 @@ type ResourcePageProps = {
 
 type ApiList = { data: Record<string, unknown>[] };
 type ApiItem = { data: Record<string, unknown> };
+type UploadResponse = { data: { uploadUrl: string; storagePath: string; fileUrl: string } };
 
-function renderCell(column: Column, item: Record<string, unknown>) {
+function uploadErrorMessage(error: unknown) {
+  if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
+    return "Upload could not reach Google Cloud Storage. Check the bucket CORS settings for http://localhost:3000, then try again.";
+  }
+  return error instanceof Error ? error.message : "Could not upload file.";
+}
+
+function relationLabel(config: RelationConfig, value: unknown, relationOptions: Record<string, Record<string, string>>) {
+  if (!value || typeof value !== "string") return "—";
+  return relationOptions[config.endpoint]?.[value] ?? value;
+}
+
+function renderCell(
+  column: Column,
+  item: Record<string, unknown>,
+  relationOptions: Record<string, Record<string, string>>
+) {
   const raw = item[column.key];
+  if (column.relation) return relationLabel(column.relation, raw, relationOptions);
   const text = column.format ? column.format(raw, item) : String(raw ?? "—");
   if (column.key === "status" && text && text !== "—") {
     return <Badge tone={statusTone(text)}>{text}</Badge>;
@@ -76,10 +110,16 @@ export function ResourcePage({
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [relationOptions, setRelationOptions] = useState<Record<string, Record<string, string>>>({});
+  const [uploadingField, setUploadingField] = useState("");
   const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
     defaultValues: defaults
   });
+  const relationKey = useMemo(() => {
+    const configs = [...fields.map((field) => field.relation), ...columns.map((column) => column.relation)].filter(Boolean) as RelationConfig[];
+    return JSON.stringify(configs.map((config) => `${config.endpoint}:${config.labelKey}:${config.emptyLabel ?? ""}`).sort());
+  }, [columns, fields]);
 
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
@@ -102,6 +142,38 @@ export function ResourcePage({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const configs = [...fields.map((field) => field.relation), ...columns.map((column) => column.relation)].filter(
+      Boolean
+    ) as RelationConfig[];
+    const unique = Array.from(new Map(configs.map((config) => [config.endpoint, config])).values());
+    if (unique.length === 0) return;
+
+    let alive = true;
+    async function loadRelations() {
+      const loaded = await Promise.all(
+        unique.map(async (config) => {
+          const response = await apiFetch<ApiList>(config.endpoint);
+          const labels = Object.fromEntries(
+            response.data
+              .filter((item) => typeof item.id === "string")
+              .map((item) => [String(item.id), String(item[config.labelKey] ?? item.id)])
+          );
+          return [config.endpoint, labels] as const;
+        })
+      );
+      if (alive) setRelationOptions(Object.fromEntries(loaded));
+    }
+
+    loadRelations().catch(() => {
+      if (alive) setRelationOptions({});
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [columns, fields, relationKey]);
 
   function startEdit(item: Record<string, unknown>) {
     setEditing(item);
@@ -148,6 +220,41 @@ export function ResourcePage({
       setItems((current) => current.filter((item) => item.id !== id));
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not delete item.");
+    }
+  }
+
+  async function uploadFile(field: Field, file: File | undefined) {
+    if (!field.upload || !file) return;
+    setError("");
+    setUploadingField(field.name);
+    try {
+      const response = await apiFetch<UploadResponse>(field.upload.endpoint, {
+        method: "POST",
+        body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream" })
+      });
+      const upload = response.data;
+      let writeResponse: Response;
+      try {
+        writeResponse = await fetch(upload.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file
+        });
+      } catch (uploadError) {
+        throw uploadError instanceof TypeError && uploadError.message.toLowerCase().includes("failed to fetch")
+          ? new Error("Upload could not reach Google Cloud Storage. Check the bucket CORS settings for http://localhost:3000, then try again.")
+          : uploadError;
+      }
+      if (!writeResponse.ok) {
+        const details = await writeResponse.text().catch(() => "");
+        throw new Error(`Google Cloud Storage upload failed (${writeResponse.status}). ${details.slice(0, 160)}`);
+      }
+      form.setValue(field.upload.storagePathField, upload.storagePath, { shouldDirty: true, shouldValidate: true });
+      form.setValue(field.upload.urlField, upload.fileUrl, { shouldDirty: true, shouldValidate: true });
+    } catch (nextError) {
+      setError(uploadErrorMessage(nextError));
+    } finally {
+      setUploadingField("");
     }
   }
 
@@ -228,6 +335,39 @@ export function ResourcePage({
                       </option>
                     ))}
                   </Select>
+                ) : field.type === "file" && field.upload ? (
+                  <div className="rounded-2xl border border-dashed border-line bg-panel/35 p-4">
+                    <input type="hidden" {...form.register(field.upload.storagePathField)} />
+                    <input type="hidden" {...form.register(field.upload.urlField)} />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                          <UploadCloud className="h-4 w-4 text-brand" />
+                          Upload file
+                        </span>
+                        <span className="mt-1 block truncate text-xs font-normal text-muted">
+                          {String(form.watch(field.upload.storagePathField) || field.placeholder || "No file uploaded yet")}
+                        </span>
+                      </div>
+                      <Input
+                        className="h-auto max-w-full cursor-pointer p-2 sm:max-w-64"
+                        type="file"
+                        accept={field.upload.accept}
+                        disabled={uploadingField === field.name}
+                        onChange={(event) => void uploadFile(field, event.target.files?.[0])}
+                      />
+                    </div>
+                    {uploadingField === field.name && <span className="mt-2 block text-xs font-medium text-brand">Uploading...</span>}
+                  </div>
+                ) : field.type === "relation" && field.relation ? (
+                  <Select {...form.register(field.name)}>
+                    <option value="">{field.relation.emptyLabel ?? "None"}</option>
+                    {Object.entries(relationOptions[field.relation.endpoint] ?? {}).map(([id, label]) => (
+                      <option key={id} value={id}>
+                        {label}
+                      </option>
+                    ))}
+                  </Select>
                 ) : (
                   <Input type={field.type ?? "text"} placeholder={field.placeholder} {...form.register(field.name)} />
                 )}
@@ -292,7 +432,9 @@ export function ResourcePage({
                   {columns.slice(1).map((column) => (
                     <div key={column.key} className="flex items-center justify-between gap-3">
                       <dt className="text-muted">{column.label}</dt>
-                      <dd className="min-w-0 truncate text-right font-medium text-ink/85">{renderCell(column, item)}</dd>
+                      <dd className="min-w-0 truncate text-right font-medium text-ink/85">
+                        {renderCell(column, item, relationOptions)}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -322,7 +464,7 @@ export function ResourcePage({
                           key={column.key}
                           className={`px-5 py-3.5 ${index === 0 ? "font-semibold text-ink" : "text-ink/75"}`}
                         >
-                          {renderCell(column, item)}
+                          {renderCell(column, item, relationOptions)}
                         </td>
                       ))}
                       <td className="px-5 py-3.5">

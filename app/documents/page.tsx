@@ -74,14 +74,30 @@ export default function DocumentsPage() {
       description="Keep important document metadata, expiry dates, storage paths, and private links in one vault."
       endpoint="/api/documents"
       schema={documentSchema}
-      defaults={{ title: "", type: "Passport", ownerName: "", fileUrl: "", storagePath: "", expiryDate: "", tags: "", notes: "" }}
+      defaults={{ title: "", type: "Passport", ownerName: "", fileUrl: "", storagePath: "", expiryDate: "", tags: "", notes: "", familyMemberId: "" }}
       fields={[
         { name: "title", label: "Title", placeholder: "Passport scan" },
         { name: "type", label: "Type", type: "select", options: ["Passport", "ID", "Visa", "Lease", "Insurance policy", "Medical record", "Receipt", "Warranty", "Contract", "Certificate"] },
         { name: "ownerName", label: "Owner name", placeholder: "Person or household" },
+        {
+          name: "familyMemberId",
+          label: "Assigned family member",
+          type: "relation",
+          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned" }
+        },
         { name: "expiryDate", label: "Expiry date", type: "date" },
-        { name: "fileUrl", label: "Private file URL", type: "url", placeholder: "Firebase Storage download URL" },
-        { name: "storagePath", label: "Storage path", placeholder: "users/{uid}/documents/..." },
+        {
+          name: "fileUpload",
+          label: "File",
+          type: "file",
+          placeholder: "PDF, image, or document file",
+          upload: {
+            endpoint: "/api/documents/upload-url",
+            storagePathField: "storagePath",
+            urlField: "fileUrl",
+            accept: "image/*,.pdf,.doc,.docx,.xls,.xlsx"
+          }
+        },
         { name: "tags", label: "Tags", placeholder: "travel, identity" },
         { name: "notes", label: "Notes", type: "textarea" }
       ]}
@@ -89,7 +105,9 @@ export default function DocumentsPage() {
         { key: "title", label: "Document" },
         { key: "type", label: "Type" },
         { key: "ownerName", label: "Owner" },
+        { key: "familyMemberId", label: "Family", relation: { endpoint: "/api/family", labelKey: "name" } },
         { key: "expiryDate", label: "Expiry" },
+        { key: "storagePath", label: "File", format: (value) => (value ? "Uploaded" : "—") },
         { key: "tags", label: "Tags", format: (value) => (Array.isArray(value) ? value.join(", ") : String(value ?? "-")) }
       ]}
       emptyTitle="Your vault is empty"

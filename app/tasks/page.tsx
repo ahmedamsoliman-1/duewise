@@ -96,13 +96,40 @@ export default function TasksPage() {
       description="Track real-life deadlines, renewals, appointments, payments, and family admin jobs."
       endpoint="/api/tasks"
       schema={taskSchema}
-      defaults={{ title: "", category: "Identity", dueDate: "", reminderDates: [], status: "upcoming", notes: "" }}
+      defaults={{
+        title: "",
+        category: "Identity",
+        dueDate: "",
+        reminderDates: [],
+        status: "upcoming",
+        notes: "",
+        familyMemberId: "",
+        linkedDocumentId: "",
+        linkedInventoryItemId: ""
+      }}
       fields={[
         { name: "title", label: "Title", placeholder: "Passport renewal" },
         { name: "category", label: "Category", type: "select", options: ["Identity", "Vehicle", "Home", "Health", "School", "Tax", "Insurance", "Other"] },
         { name: "dueDate", label: "Due date", type: "date" },
         { name: "status", label: "Status", type: "select", options: ["upcoming", "due soon", "overdue", "completed"] },
-        { name: "familyMemberId", label: "Family member ID", placeholder: "Optional" },
+        {
+          name: "familyMemberId",
+          label: "Assigned family member",
+          type: "relation",
+          relation: { endpoint: "/api/family", labelKey: "name", emptyLabel: "Unassigned" }
+        },
+        {
+          name: "linkedDocumentId",
+          label: "Linked document",
+          type: "relation",
+          relation: { endpoint: "/api/documents", labelKey: "title", emptyLabel: "No linked document" }
+        },
+        {
+          name: "linkedInventoryItemId",
+          label: "Linked inventory item",
+          type: "relation",
+          relation: { endpoint: "/api/inventory", labelKey: "name", emptyLabel: "No linked item" }
+        },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Anything useful to remember" }
       ]}
       columns={[
@@ -110,6 +137,8 @@ export default function TasksPage() {
         { key: "category", label: "Category" },
         { key: "dueDate", label: "Due" },
         { key: "status", label: "Status" },
+        { key: "familyMemberId", label: "Assigned", relation: { endpoint: "/api/family", labelKey: "name" } },
+        { key: "linkedDocumentId", label: "Document", relation: { endpoint: "/api/documents", labelKey: "title" } },
         { key: "notes", label: "Notes" }
       ]}
       emptyTitle="No deadlines yet"

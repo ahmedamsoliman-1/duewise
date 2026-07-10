@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const optionalText = z.string().trim().optional().or(z.literal(""));
 const optionalUrl = z.string().url().optional().or(z.literal(""));
+const optionalFileRef = z.string().trim().optional().or(z.literal(""));
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.");
 const optionalDate = date.optional().or(z.literal(""));
 
@@ -21,7 +22,7 @@ export const documentSchema = z.object({
   title: z.string().trim().min(1),
   type: z.string().trim().min(1),
   ownerName: z.string().trim().min(1),
-  fileUrl: optionalUrl,
+  fileUrl: optionalFileRef,
   storagePath: optionalText,
   expiryDate: optionalDate,
   tags: z.preprocess(
@@ -58,7 +59,7 @@ export const inventorySchema = z.object({
   currency: z.string().trim().min(3).max(3).default("USD"),
   warrantyExpiryDate: optionalDate,
   receiptDocumentId: optionalText,
-  imageUrl: optionalUrl,
+  imageUrl: optionalFileRef,
   storagePath: optionalText,
   notes: optionalText
 });

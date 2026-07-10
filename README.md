@@ -21,6 +21,22 @@ Duewise is a single Next.js Backend-for-Frontend app for personal life admin and
 
 2. Copy `.env.example` to `.env.local` and fill in Firebase client and Admin credentials.
 
+   For uploads, set `GCP_STORAGE_BUCKET` to the Google Cloud Storage bucket Duewise should use. If it is not set, the app falls back to `FIREBASE_STORAGE_BUCKET`. The Firebase Admin service account must have permission to create objects in that bucket.
+
+   Keep public access prevention enabled on the bucket. Duewise stores files privately and uploads through short-lived signed URLs created by the BFF.
+
+   Browser uploads also need bucket CORS for local development. Copy `gcs-cors.local.json.example` to your own local file, keep `http://localhost:3000` in the origin list, and apply it:
+
+   ```bash
+   gcloud storage buckets update gs://YOUR_BUCKET_NAME --cors-file=gcs-cors.local.json
+   ```
+
+   To confirm it was applied:
+
+   ```bash
+   gcloud storage buckets describe gs://YOUR_BUCKET_NAME --format="default(cors_config)"
+   ```
+
 3. Enable Firebase Authentication providers:
    - Email/password
    - Google, optional but already wired in the UI
@@ -53,6 +69,8 @@ Storage paths:
 users/{userId}/documents/{documentId}/{fileName}
 users/{userId}/inventory/{itemId}/{fileName}
 ```
+
+Uploaded file metadata stores a private `gs://bucket/users/{userId}/...` reference plus the object path. The bucket does not need to be public.
 
 ## BFF Routes
 

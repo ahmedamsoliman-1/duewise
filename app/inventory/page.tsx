@@ -71,8 +71,24 @@ export default function InventoryPage() {
         { name: "purchasePrice", label: "Purchase price", type: "number" },
         { name: "currency", label: "Currency", placeholder: "USD" },
         { name: "warrantyExpiryDate", label: "Warranty expiry", type: "date" },
-        { name: "receiptDocumentId", label: "Receipt document ID" },
-        { name: "imageUrl", label: "Image URL", type: "url" },
+        {
+          name: "receiptDocumentId",
+          label: "Receipt / warranty document",
+          type: "relation",
+          relation: { endpoint: "/api/documents", labelKey: "title", emptyLabel: "No linked document" }
+        },
+        {
+          name: "imageUpload",
+          label: "Item image",
+          type: "file",
+          placeholder: "Photo of item, receipt, or serial plate",
+          upload: {
+            endpoint: "/api/inventory/upload-url",
+            storagePathField: "storagePath",
+            urlField: "imageUrl",
+            accept: "image/*,.pdf"
+          }
+        },
         { name: "notes", label: "Notes", type: "textarea" }
       ]}
       columns={[
@@ -80,7 +96,9 @@ export default function InventoryPage() {
         { key: "category", label: "Category" },
         { key: "purchasePrice", label: "Value", format: (value, row) => `${row.currency ?? "USD"} ${Number(value ?? 0).toFixed(2)}` },
         { key: "purchaseDate", label: "Purchased" },
-        { key: "warrantyExpiryDate", label: "Warranty" }
+        { key: "warrantyExpiryDate", label: "Warranty" },
+        { key: "receiptDocumentId", label: "Document", relation: { endpoint: "/api/documents", labelKey: "title" } },
+        { key: "storagePath", label: "Image", format: (value) => (value ? "Uploaded" : "—") }
       ]}
       emptyTitle="No inventory items yet"
       emptyBody="Add appliances, electronics, furniture, jewelry, and other valuable items while the receipt and warranty details are still easy to find."
