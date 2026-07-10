@@ -9,6 +9,8 @@ export type Subscription = {
   currency: string;
   billingCycle: BillingCycle;
   nextBillingDate: string;
+  recurrenceInterval?: "none" | "weekly" | "monthly" | "yearly";
+  recurrenceEndDate?: string;
   cancellationUrl?: string;
   status: SubscriptionStatus;
   notes?: string;

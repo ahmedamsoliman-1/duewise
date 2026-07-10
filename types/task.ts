@@ -7,6 +7,8 @@ export type Task = {
   dueDate: string;
   reminderDates: string[];
   status: TaskStatus;
+  recurrenceInterval?: "none" | "weekly" | "monthly" | "yearly";
+  recurrenceEndDate?: string;
   notes?: string;
   linkedDocumentId?: string;
   linkedInventoryItemId?: string;

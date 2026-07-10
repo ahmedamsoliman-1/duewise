@@ -82,10 +82,16 @@ const taskTemplates = [
 
 function prepareTask(values: Record<string, unknown>) {
   const dueDate = typeof values.dueDate === "string" ? values.dueDate : "";
+  const recurrenceInterval = typeof values.recurrenceInterval === "string" ? values.recurrenceInterval : "none";
+  const recurrenceEndDate = typeof values.recurrenceEndDate === "string" ? values.recurrenceEndDate : "";
+  const nextStatus = dueDate ? calculateTaskStatus(dueDate, values.status === "completed") : values.status;
+
   return {
     ...values,
     reminderDates: dueDate ? buildReminderDates(dueDate) : values.reminderDates,
-    status: dueDate ? calculateTaskStatus(dueDate, values.status === "completed") : values.status
+    status: nextStatus,
+    recurrenceInterval,
+    recurrenceEndDate: recurrenceEndDate || undefined
   };
 }
 
@@ -102,6 +108,8 @@ export default function TasksPage() {
         dueDate: "",
         reminderDates: [],
         status: "upcoming",
+        recurrenceInterval: "none",
+        recurrenceEndDate: "",
         notes: "",
         familyMemberId: "",
         linkedDocumentId: "",
@@ -112,6 +120,8 @@ export default function TasksPage() {
         { name: "category", label: "Category", type: "select", options: ["Identity", "Vehicle", "Home", "Health", "School", "Tax", "Insurance", "Other"] },
         { name: "dueDate", label: "Due date", type: "date" },
         { name: "status", label: "Status", type: "select", options: ["upcoming", "due soon", "overdue", "completed"] },
+        { name: "recurrenceInterval", label: "Repeat", type: "select", options: ["none", "weekly", "monthly", "yearly"] },
+        { name: "recurrenceEndDate", label: "Repeat until", type: "date" },
         {
           name: "familyMemberId",
           label: "Assigned family member",

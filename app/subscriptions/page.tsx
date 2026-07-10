@@ -3,6 +3,18 @@
 import { ResourcePage } from "@/components/tables/resource-page";
 import { subscriptionSchema } from "@/lib/validators/schemas";
 
+function prepareSubscription(values: Record<string, unknown>) {
+  const nextBillingDate = typeof values.nextBillingDate === "string" ? values.nextBillingDate : "";
+  const recurrenceInterval = typeof values.recurrenceInterval === "string" ? values.recurrenceInterval : "none";
+  const recurrenceEndDate = typeof values.recurrenceEndDate === "string" ? values.recurrenceEndDate : "";
+
+  return {
+    ...values,
+    recurrenceInterval,
+    recurrenceEndDate: recurrenceEndDate || undefined
+  };
+}
+
 const subscriptionTemplates = [
   {
     title: "Cloud storage",
@@ -65,7 +77,7 @@ export default function SubscriptionsPage() {
       description="See recurring payments before they happen and keep cancellation links close at hand."
       endpoint="/api/subscriptions"
       schema={subscriptionSchema}
-      defaults={{ name: "", category: "Software", cost: 0, currency: "USD", billingCycle: "monthly", nextBillingDate: "", cancellationUrl: "", status: "active", notes: "" }}
+      defaults={{ name: "", category: "Software", cost: 0, currency: "USD", billingCycle: "monthly", nextBillingDate: "", recurrenceInterval: "none", recurrenceEndDate: "", cancellationUrl: "", status: "active", notes: "" }}
       fields={[
         { name: "name", label: "Name", placeholder: "Cloud storage" },
         { name: "category", label: "Category", type: "select", options: ["Software", "Streaming", "Utilities", "Insurance", "Membership", "Education", "Other"] },
@@ -73,6 +85,8 @@ export default function SubscriptionsPage() {
         { name: "currency", label: "Currency", placeholder: "USD" },
         { name: "billingCycle", label: "Billing cycle", type: "select", options: ["monthly", "yearly", "weekly"] },
         { name: "nextBillingDate", label: "Next billing date", type: "date" },
+        { name: "recurrenceInterval", label: "Repeat", type: "select", options: ["none", "weekly", "monthly", "yearly"] },
+        { name: "recurrenceEndDate", label: "Repeat until", type: "date" },
         { name: "status", label: "Status", type: "select", options: ["active", "paused", "cancelled"] },
         { name: "cancellationUrl", label: "Cancellation URL", type: "url" },
         { name: "notes", label: "Notes", type: "textarea" }
@@ -88,6 +102,7 @@ export default function SubscriptionsPage() {
       emptyTitle="No recurring payments tracked"
       emptyBody="Add subscriptions, memberships, insurance payments, and other repeating charges to understand your monthly spend."
       templates={subscriptionTemplates}
+      prepareSubmit={prepareSubscription}
       quickFilters={[
         { label: "Active", key: "status", value: "active" },
         { label: "Paused", key: "status", value: "paused" },

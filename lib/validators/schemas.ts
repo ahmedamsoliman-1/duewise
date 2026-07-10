@@ -12,6 +12,8 @@ export const taskSchema = z.object({
   dueDate: date,
   reminderDates: z.array(date).default([]),
   status: z.enum(["upcoming", "due soon", "overdue", "completed"]).default("upcoming"),
+  recurrenceInterval: z.enum(["none", "weekly", "monthly", "yearly"]).default("none"),
+  recurrenceEndDate: optionalDate,
   notes: optionalText,
   linkedDocumentId: optionalText,
   linkedInventoryItemId: optionalText,
@@ -47,6 +49,8 @@ export const subscriptionSchema = z.object({
   currency: z.string().trim().min(3).max(3).default("USD"),
   billingCycle: z.enum(["monthly", "yearly", "weekly"]).default("monthly"),
   nextBillingDate: date,
+  recurrenceInterval: z.enum(["none", "weekly", "monthly", "yearly"]).default("none"),
+  recurrenceEndDate: optionalDate,
   cancellationUrl: optionalUrl,
   status: z.enum(["active", "paused", "cancelled"]).default("active"),
   notes: optionalText
