@@ -219,7 +219,7 @@ export function ProfileClient() {
     : null;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="mx-auto grid max-w-6xl gap-6 overflow-hidden">
       {/* Account hero — same branded surface as the Dashboard: onyx base + aurora overlay */}
       <header className="relative overflow-hidden rounded-3xl border border-white/5 bg-onyx p-6 text-white sm:p-8">
         <div className="brand-aurora pointer-events-none absolute inset-0 opacity-90" />
@@ -238,9 +238,9 @@ export function ProfileClient() {
             )}
             <div className="min-w-0">
               <p className="font-display text-2xl font-extrabold tracking-tight">{user?.displayName || "Your account"}</p>
-              <p className="flex items-center gap-1.5 text-sm text-white/70">
-                <Mail className="h-3.5 w-3.5" />
-                {user?.email}
+              <p className="flex min-w-0 items-center gap-1.5 text-sm text-white/70">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 truncate">{user?.email}</span>
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 {providerIds.map((id) => (
@@ -277,7 +277,7 @@ export function ProfileClient() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
         {/* Profile edit */}
         <Card>
           <CardHeader icon={<UserRound className="h-5 w-5" />} title="Profile details" description="How you show up in your workspace." />
@@ -341,13 +341,13 @@ export function ProfileClient() {
               {factors.map((factor) => (
                 <li
                   key={factor.uid}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel/50 px-3.5 py-2.5"
+                  className="grid gap-2 rounded-xl border border-line bg-panel/50 px-3.5 py-2.5 sm:flex sm:items-center sm:justify-between sm:gap-3"
                 >
-                  <span className="flex items-center gap-2.5 text-sm">
-                    <Smartphone className="h-4 w-4 text-brand" />
-                    <span className="font-medium text-ink">{factor.displayName || "Authenticator app"}</span>
+                  <span className="flex min-w-0 items-center gap-2.5 text-sm">
+                    <Smartphone className="h-4 w-4 shrink-0 text-brand" />
+                    <span className="min-w-0 truncate font-medium text-ink">{factor.displayName || "Authenticator app"}</span>
                   </span>
-                  <Button variant="ghost" size="sm" disabled={busy === `mfa-remove-${factor.uid}`} onClick={() => removeFactor(factor)}>
+                  <Button variant="ghost" size="sm" className="w-full sm:w-auto" disabled={busy === `mfa-remove-${factor.uid}`} onClick={() => removeFactor(factor)}>
                     <Trash2 className="h-4 w-4" />
                     Remove
                   </Button>

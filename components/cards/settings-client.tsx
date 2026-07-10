@@ -56,8 +56,8 @@ export function SettingsClient() {
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
-      <header>
+    <div className="mx-auto grid max-w-6xl gap-6 overflow-hidden">
+      <header className="min-w-0">
         <h1 className="font-display text-3xl font-extrabold text-ink">Settings</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           Appearance and general preferences for your Duewise workspace. Looking for your account, password, or 2FA?{" "}
@@ -68,7 +68,7 @@ export function SettingsClient() {
         </p>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
         {/* Appearance */}
         <Card>
           <CardHeader
@@ -115,12 +115,12 @@ export function SettingsClient() {
           />
           <div className="grid gap-4">
             <div className="rounded-xl bg-panel/50 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
+              <div className="grid gap-3 sm:flex sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0">
                   <p className="font-semibold text-ink">Browser push</p>
                   <p className="mt-1 text-sm text-muted">Get daily attention alerts on this device.</p>
                 </div>
-                <Button variant={preferences?.browserPushEnabled ? "secondary" : "primary"} size="sm" disabled={notificationBusy} onClick={enablePush}>
+                <Button variant={preferences?.browserPushEnabled ? "secondary" : "primary"} size="sm" className="w-full sm:w-auto" disabled={notificationBusy} onClick={enablePush}>
                   <BellRing className="h-4 w-4" />
                   {preferences?.browserPushEnabled ? "Refresh" : "Enable"}
                 </Button>
@@ -128,14 +128,14 @@ export function SettingsClient() {
             </div>
             <button
               type="button"
-              className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 text-left"
+              className="grid gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-left sm:flex sm:items-center sm:justify-between"
               onClick={toggleDigest}
             >
-              <span>
+              <span className="min-w-0">
                 <span className="block font-semibold text-ink">Daily attention digest</span>
                 <span className="text-sm text-muted">One push per day when something needs attention.</span>
               </span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${preferences?.dailyDigestEnabled ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-panel text-muted"}`}>
+              <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${preferences?.dailyDigestEnabled ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-panel text-muted"}`}>
                 {preferences?.dailyDigestEnabled ? "On" : "Off"}
               </span>
             </button>
@@ -148,8 +148,8 @@ export function SettingsClient() {
           <CardHeader icon={<UploadCloud className="h-5 w-5" />} title="Storage coordination" description="Signed upload URLs, scoped to your UID." />
           <p className="text-sm text-muted">The BFF exposes signed upload URL endpoints for document and inventory files.</p>
           <div className="mt-4 grid gap-2">
-            <code className="rounded-lg bg-panel/60 px-3 py-2 text-xs text-ink/80">/api/documents/upload-url</code>
-            <code className="rounded-lg bg-panel/60 px-3 py-2 text-xs text-ink/80">/api/inventory/upload-url</code>
+            <code className="break-all rounded-lg bg-panel/60 px-3 py-2 text-xs text-ink/80">/api/documents/upload-url</code>
+            <code className="break-all rounded-lg bg-panel/60 px-3 py-2 text-xs text-ink/80">/api/inventory/upload-url</code>
           </div>
         </Card>
 

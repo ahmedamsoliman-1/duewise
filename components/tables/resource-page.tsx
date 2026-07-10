@@ -150,7 +150,7 @@ function renderCell(
   if (column.key === "storagePath") {
     if (!raw || typeof raw !== "string") return "—";
     return (
-      <div className="flex items-center justify-end gap-2 md:justify-start">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 md:justify-start">
         {previewUrls[raw] ? (
           <button
             type="button"
@@ -165,7 +165,7 @@ function renderCell(
           type="button"
           variant="secondary"
           size="sm"
-          className="h-8 gap-1.5 px-2.5"
+          className="h-8 min-w-0 gap-1.5 px-2.5"
           disabled={openingPath === raw}
           onClick={() => openStoredFile(raw)}
         >
@@ -385,7 +385,7 @@ function ResourceGridCards({
   const detailColumns = columns.filter((column) => column.key !== titleColumn.key && column.key !== "storagePath");
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => {
         const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
         const previewUrl = storagePath ? previewUrls[storagePath] : "";
@@ -420,7 +420,7 @@ function ResourceGridCards({
               ) : null}
             </button>
 
-            <div className="grid gap-4 p-4">
+            <div className="grid min-w-0 gap-4 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="truncate font-display text-lg font-extrabold text-ink">
@@ -457,13 +457,13 @@ function ResourceGridCards({
 
               {storagePath ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => onOpenFile(storagePath)}>
+                  <Button type="button" variant="secondary" size="sm" className="min-w-0 px-2" onClick={() => onOpenFile(storagePath)}>
                     <ExternalLink className="h-4 w-4" />
-                    {openingPath === storagePath ? "Opening" : "Open"}
+                    <span className="truncate">{openingPath === storagePath ? "Opening" : "Open"}</span>
                   </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => onDownloadFile(storagePath)}>
+                  <Button type="button" variant="secondary" size="sm" className="min-w-0 px-2" onClick={() => onDownloadFile(storagePath)}>
                     <Download className="h-4 w-4" />
-                    Download
+                    <span className="truncate">Download</span>
                   </Button>
                 </div>
               ) : (
@@ -752,14 +752,14 @@ export function ResourcePage({
   const singular = title.toLowerCase().replace(/s$/, "");
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
+    <div className="mx-auto grid max-w-7xl gap-6 overflow-hidden">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink">{title}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 sm:w-72">
+        <div className="grid min-w-0 grid-cols-[1fr_auto] gap-2 sm:flex sm:items-center">
+          <div className="relative min-w-0 sm:w-72">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
               className="pl-10"
@@ -803,7 +803,7 @@ export function ResourcePage({
             title="Quick starts"
             description={`Choose a common ${singular} template, then adjust the details before saving.`}
           />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {templates.map((template) => (
               <button
                 key={template.title}
@@ -832,7 +832,7 @@ export function ResourcePage({
               </Button>
             }
           />
-          <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={form.handleSubmit(submit)}>
+          <form className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={form.handleSubmit(submit)}>
             {fields.map((field) => (
               <Label key={field.name}>
                 {field.label}
@@ -868,7 +868,7 @@ export function ResourcePage({
                           {form.watch(field.upload.storagePathField) ? "File uploaded. Save this entry to keep it attached." : field.placeholder || "No file uploaded yet"}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid gap-2 sm:flex sm:flex-wrap">
                         <label
                           htmlFor={`${title}-${field.name}-input`}
                           className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink transition-colors hover:bg-panel sm:w-auto"
@@ -941,7 +941,7 @@ export function ResourcePage({
 
       {!formOpen && quickFilters.length > 0 && (
         <Card className="p-3 sm:p-4">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
             <button
               type="button"
               className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition-colors ${
@@ -976,7 +976,7 @@ export function ResourcePage({
       )}
 
       {preferredListView && !loading && filtered.length > 0 ? (
-        <div className="flex rounded-xl border border-line bg-surface p-1 sm:hidden">
+        <div className="flex min-w-0 rounded-xl border border-line bg-surface p-1 sm:hidden">
           <button
             type="button"
             className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-colors ${listView === "grid" ? "bg-brand-soft text-brand-strong" : "text-muted"}`}
@@ -1030,7 +1030,7 @@ export function ResourcePage({
           ) : null}
 
           {/* Mobile cards */}
-          <div className={`grid gap-3 md:hidden ${preferredListView && listView === "grid" ? "hidden" : ""}`}>
+          <div className={`grid min-w-0 gap-3 md:hidden ${preferredListView && listView === "grid" ? "hidden" : ""}`}>
             {filtered.map((item) => (
               <Card key={String(item.id)} className="p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -1048,9 +1048,9 @@ export function ResourcePage({
                 </div>
                 <dl className="mt-3 grid gap-1.5 text-sm">
                   {columns.slice(1).map((column) => (
-                    <div key={column.key} className="flex items-center justify-between gap-3">
-                      <dt className="text-muted">{column.label}</dt>
-                      <dd className="min-w-0 truncate text-right font-medium text-ink/85">
+                    <div key={column.key} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+                      <dt className="shrink-0 text-muted">{column.label}</dt>
+                      <dd className="min-w-0 overflow-hidden break-words text-right font-medium text-ink/85">
                         {renderCell(column, item, relationOptions, openStoredFile, downloadStoredFile, openingPath, downloadingPath, previewUrls)}
                       </dd>
                     </div>
