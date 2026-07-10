@@ -80,25 +80,30 @@ If Redis is unavailable, invalidation is skipped silently.
    npm install redis
    ```
 
-2. **Set environment variable:**
+2. **Set environment variables:**
    ```bash
    # .env.local (development)
    REDIS_URL=redis://localhost:6379
+   ENABLE_REDIS=true
    
    # Vercel (production)
-   # Set REDIS_URL in Vercel dashboard > Settings > Environment Variables
+   # Set both in Vercel dashboard > Settings > Environment Variables
+   REDIS_URL=redis://default:YOUR_PASSWORD@YOUR_ENDPOINT:PORT
+   ENABLE_REDIS=true
    ```
 
 3. **If using Upstash or other cloud Redis:**
    ```bash
    REDIS_URL=redis://default:YOUR_PASSWORD@YOUR_ENDPOINT:PORT
+   ENABLE_REDIS=true
    ```
 
 ### Disable Redis (optional)
 
 To disable Redis and use only Firestore:
-- **Don't set `REDIS_URL`** environment variable
+- Set `ENABLE_REDIS=false` (or leave unset, defaults to false)
 - The app will work identically but without caching
+- REDIS_URL can remain configured; it simply won't be used
 
 ## Implementation guide
 
@@ -113,15 +118,24 @@ let redisClient: RedisClientType | null = null;
 let redisConnected = false;
 
 export async function initRedis() {
+  if (initAttempted) return;
+  initAttempted = true;
+
+  // Check if Redis is explicitly enabled
+  if (process.env.ENABLE_REDIS !== "true") {
+    console.log("[Redis] Disabled: ENABLE_REDIS not set to 'true'");
+    return;
+  }
+
   if (!process.env.REDIS_URL) {
-    console.log('[Redis] Disabled: REDIS_URL not set');
+    console.warn("[Redis] ENABLE_REDIS=true but REDIS_URL not set");
     return;
   }
 
   try {
     redisClient = createClient({ url: process.env.REDIS_URL });
     
-    redisClient.on('error', (err) => {
+    redisClient.on('error', (err: Error) => {
       console.error('[Redis] Error:', err.message);
       redisConnected = false;
     });
