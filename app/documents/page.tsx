@@ -116,6 +116,16 @@ export default function DocumentsPage() {
       emptyBody="Start with IDs, passports, visas, leases, policies, receipts, and warranties. Files stay under your user-scoped Firebase Storage path."
       templates={documentTemplates}
       preferredListView="grid"
+      quickFilters={[
+        { label: "Passport", key: "type", value: "Passport" },
+        { label: "ID", key: "type", value: "ID" },
+        { label: "Visa", key: "type", value: "Visa" },
+        { label: "Contracts", key: "type", predicate: (item) => item.type === "Contract" || item.type === "Lease" },
+        { label: "With file", key: "storagePath", predicate: (item) => Boolean(item.storagePath) },
+        { label: "Missing file", key: "storagePath", predicate: (item) => !item.storagePath },
+        { label: "Has expiry", key: "expiryDate", predicate: (item) => Boolean(item.expiryDate) },
+        { label: "No expiry", key: "expiryDate", predicate: (item) => !item.expiryDate }
+      ]}
     />
   );
 }

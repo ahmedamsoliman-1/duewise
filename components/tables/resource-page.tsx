@@ -449,7 +449,8 @@ export function ResourcePage({
   templates = [],
   prepareSubmit,
   visualMode,
-  preferredListView
+  preferredListView,
+  quickFilters = []
 }: ResourcePageProps) {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -462,19 +463,34 @@ export function ResourcePage({
   const [openingPath, setOpeningPath] = useState("");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [listView, setListView] = useState<"grid" | "table">(preferredListView ?? "table");
+  const [activeFilter, setActiveFilter] = useState("");
   const form = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
     defaultValues: defaults
   });
   const relationKey = useMemo(() => {
-    const configs = [...fields.map((field) => field.relation), ...columns.map((column) => column.relation)].filter(Boolean) as RelationConfig[];
+    const configs = [
+      ...fields.map((field) => field.relation),
+      ...columns.map((column) => column.relation),
+      ...quickFilters.map((filter) => filter.relation)
+    ].filter(Boolean) as RelationConfig[];
     return JSON.stringify(configs.map((config) => `${config.endpoint}:${config.labelKey}:${config.emptyLabel ?? ""}:${config.includeSelf ? "self" : ""}`).sort());
-  }, [columns, fields]);
+  }, [columns, fields, quickFilters]);
 
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
-    return items.filter((item) => JSON.stringify(item).toLowerCase().includes(needle));
-  }, [items, query]);
+    const selected = quickFilters.find((filter) => filter.label === activeFilter);
+    return items.filter((item) => {
+      const matchesSearch = JSON.stringify(item).toLowerCase().includes(needle);
+      const matchesFilter = selected ? filterMatches(selected, item) : true;
+      return matchesSearch && matchesFilter;
+    });
+  }, [activeFilter, items, query, quickFilters]);
+
+  const filterCounts = useMemo(
+    () => Object.fromEntries(quickFilters.map((filter) => [filter.label, items.filter((item) => filterMatches(filter, item)).length])),
+    [items, quickFilters]
+  );
 
   const previewPathKey = useMemo(() => {
     const paths = filtered
@@ -502,9 +518,11 @@ export function ResourcePage({
   }, [load]);
 
   useEffect(() => {
-    const configs = [...fields.map((field) => field.relation), ...columns.map((column) => column.relation)].filter(
-      Boolean
-    ) as RelationConfig[];
+    const configs = [
+      ...fields.map((field) => field.relation),
+      ...columns.map((column) => column.relation),
+      ...quickFilters.map((filter) => filter.relation)
+    ].filter(Boolean) as RelationConfig[];
     const unique = Array.from(new Map(configs.map((config) => [config.endpoint, config])).values());
     if (unique.length === 0) return;
 
@@ -534,7 +552,7 @@ export function ResourcePage({
     return () => {
       alive = false;
     };
-  }, [columns, fields, relationKey]);
+  }, [columns, fields, quickFilters, relationKey]);
 
   useEffect(() => {
     const paths = JSON.parse(previewPathKey) as string[];
@@ -843,6 +861,38 @@ export function ResourcePage({
         </p>
       )}
 
+      {!formOpen && quickFilters.length > 0 && (
+        <Card className="p-3 sm:p-4">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition-colors ${
+                !activeFilter ? "border-brand/25 bg-brand-soft text-brand-strong" : "border-line bg-surface text-muted hover:bg-panel"
+              }`}
+              onClick={() => setActiveFilter("")}
+            >
+              All
+              <span className="rounded-full bg-surface/80 px-1.5 text-xs text-ink/70">{items.length}</span>
+            </button>
+            {quickFilters.map((filter) => (
+              <button
+                key={filter.label}
+                type="button"
+                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold transition-colors ${
+                  activeFilter === filter.label
+                    ? "border-brand/25 bg-brand-soft text-brand-strong"
+                    : "border-line bg-surface text-muted hover:bg-panel"
+                }`}
+                onClick={() => setActiveFilter((current) => (current === filter.label ? "" : filter.label))}
+              >
+                {filter.label}
+                <span className="rounded-full bg-surface/80 px-1.5 text-xs text-ink/70">{filterCounts[filter.label] ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {visualMode === "familyTree" && !loading && (
         <FamilyTreePreview items={filtered} onEdit={startEdit} />
       )}
@@ -882,8 +932,8 @@ export function ResourcePage({
           <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-soft text-brand">
             <Inbox className="h-7 w-7" />
           </span>
-          <h2 className="mt-4 font-display text-lg font-bold text-ink">{query ? "No matches" : emptyTitle}</h2>
-          <p className="mt-1 max-w-md text-sm text-muted">{query ? "Try a different search term." : emptyBody}</p>
+          <h2 className="mt-4 font-display text-lg font-bold text-ink">{query || activeFilter ? "No matches" : emptyTitle}</h2>
+          <p className="mt-1 max-w-md text-sm text-muted">{query || activeFilter ? "Try a different search term or clear the active filter." : emptyBody}</p>
         </Card>
       ) : (
         <>

@@ -145,6 +145,15 @@ export default function TasksPage() {
       emptyBody="Add passports, registrations, insurance renewals, bills, appointments, and anything else Future You should not have to remember manually."
       templates={taskTemplates}
       prepareSubmit={prepareTask}
+      quickFilters={[
+        { label: "Due soon", key: "status", value: "due soon" },
+        { label: "Overdue", key: "status", value: "overdue" },
+        { label: "Completed", key: "status", value: "completed" },
+        { label: "Identity", key: "category", value: "Identity" },
+        { label: "Vehicle", key: "category", value: "Vehicle" },
+        { label: "Health", key: "category", value: "Health" },
+        { label: "School", key: "category", value: "School" }
+      ]}
     />
   );
 }

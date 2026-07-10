@@ -159,6 +159,15 @@ export default function LifeEventsPage() {
       emptyTitle="No life events yet"
       emptyBody="Add the human milestones that belong beside your admin timeline: graduations, work, service, weddings, births, memorials, moves, and the big custom moments."
       templates={lifeEventTemplates}
+      quickFilters={[
+        { label: "Landmark", key: "importance", value: "landmark" },
+        { label: "High", key: "importance", value: "high" },
+        { label: "Sensitive", key: "privacy", value: "sensitive" },
+        { label: "Work", key: "type", value: "work" },
+        { label: "Wedding", key: "type", value: "wedding" },
+        { label: "Birth", key: "type", value: "birth" },
+        { label: "Property", key: "type", value: "property" }
+      ]}
     />
   );
 }

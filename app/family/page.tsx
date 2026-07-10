@@ -26,6 +26,12 @@ export default function FamilyPage() {
       emptyTitle="No family members yet"
       emptyBody="Add family or household members to make passports, appointments, school payments, and shared documents easier to organize."
       visualMode="familyTree"
+      quickFilters={[
+        { label: "Parents", key: "relationship", predicate: (item) => /\b(mother|father|parent|mom|mum|dad|stepmother|stepfather)\b/i.test(String(item.relationship ?? "")) },
+        { label: "Partner", key: "relationship", predicate: (item) => /\b(wife|husband|spouse|partner)\b/i.test(String(item.relationship ?? "")) },
+        { label: "Children", key: "relationship", predicate: (item) => /\b(son|daughter|child|kid|children)\b/i.test(String(item.relationship ?? "")) },
+        { label: "Siblings", key: "relationship", predicate: (item) => /\b(brother|sister|sibling)\b/i.test(String(item.relationship ?? "")) }
+      ]}
     />
   );
 }

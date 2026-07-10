@@ -88,6 +88,15 @@ export default function SubscriptionsPage() {
       emptyTitle="No recurring payments tracked"
       emptyBody="Add subscriptions, memberships, insurance payments, and other repeating charges to understand your monthly spend."
       templates={subscriptionTemplates}
+      quickFilters={[
+        { label: "Active", key: "status", value: "active" },
+        { label: "Paused", key: "status", value: "paused" },
+        { label: "Cancelled", key: "status", value: "cancelled" },
+        { label: "Monthly", key: "billingCycle", value: "monthly" },
+        { label: "Yearly", key: "billingCycle", value: "yearly" },
+        { label: "Software", key: "category", value: "Software" },
+        { label: "Insurance", key: "category", value: "Insurance" }
+      ]}
     />
   );
 }

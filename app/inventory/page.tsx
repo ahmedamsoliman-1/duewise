@@ -103,6 +103,15 @@ export default function InventoryPage() {
       emptyTitle="No inventory items yet"
       emptyBody="Add appliances, electronics, furniture, jewelry, and other valuable items while the receipt and warranty details are still easy to find."
       templates={inventoryTemplates}
+      quickFilters={[
+        { label: "Electronics", key: "category", value: "Electronics" },
+        { label: "Appliance", key: "category", value: "Appliance" },
+        { label: "Vehicle", key: "category", value: "Vehicle" },
+        { label: "Jewelry", key: "category", value: "Jewelry" },
+        { label: "Has warranty", key: "warrantyExpiryDate", predicate: (item) => Boolean(item.warrantyExpiryDate) },
+        { label: "Receipt linked", key: "receiptDocumentId", predicate: (item) => Boolean(item.receiptDocumentId) },
+        { label: "With image", key: "storagePath", predicate: (item) => Boolean(item.storagePath) }
+      ]}
     />
   );
 }
