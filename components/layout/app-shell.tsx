@@ -11,6 +11,7 @@ import {
   MoonStar,
   MoreHorizontal,
   Settings,
+  ShieldCheck,
   Sun,
   Users,
   Waypoints,
@@ -22,6 +23,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { auth, firebaseApp } from "@/lib/firebase/client";
+import { ADMIN_EMAIL } from "@/lib/admin/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useTheme } from "@/components/layout/theme-provider";
@@ -47,6 +49,7 @@ const navItems: NavItem[] = [
 ];
 
 const primaryItems = navItems.filter((item) => item.primary);
+const adminItem: NavItem = { href: "/admin", label: "Admin Console", icon: ShieldCheck };
 
 function initialsFor(name?: string | null, email?: string | null) {
   const source = name?.trim() || email?.split("@")[0] || "";
@@ -152,6 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const initials = initialsFor(user.displayName, user.email);
+  const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL;
 
   return (
     <div className="min-h-screen bg-bg lg:flex">
@@ -166,6 +170,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => (
               <NavLink key={item.href} item={item} active={isActive(item.href)} />
             ))}
+            {isAdmin && (
+              <div className="mt-3 border-t border-line pt-3">
+                <NavLink item={adminItem} active={isActive(adminItem.href)} />
+              </div>
+            )}
           </nav>
           <div className="mt-4 border-t border-line pt-3">
             <button
@@ -280,6 +289,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
+              {isAdmin && (
+                <Link
+                  href={adminItem.href}
+                  className={cn(
+                    "col-span-2 flex items-center gap-3 rounded-xl border p-3 text-sm font-medium transition-colors",
+                    isActive(adminItem.href)
+                      ? "border-brand/30 bg-brand-soft text-brand-strong"
+                      : "border-line bg-panel/50 text-ink/75 hover:text-ink"
+                  )}
+                >
+                  <ShieldCheck className="h-[18px] w-[18px]" />
+                  {adminItem.label}
+                </Link>
+              )}
               {navItems
                 .filter((item) => !item.primary)
                 .map((item) => {

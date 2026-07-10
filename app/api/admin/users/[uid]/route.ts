@@ -8,9 +8,9 @@ type Context = { params: Promise<{ uid: string }> };
 
 const patchSchema = z.object({ disabled: z.boolean() });
 
-export async function GET(_request: NextRequest, { params }: Context) {
+export async function GET(request: NextRequest, { params }: Context) {
   try {
-    await requireAdmin();
+    await requireAdmin(request);
     const { uid } = await params;
     const detail = await getUserDetailForAdmin(uid);
     return NextResponse.json({ data: detail });
@@ -21,7 +21,7 @@ export async function GET(_request: NextRequest, { params }: Context) {
 
 export async function PATCH(request: NextRequest, { params }: Context) {
   try {
-    await requireAdmin();
+    await requireAdmin(request);
     const { uid } = await params;
     const { disabled } = patchSchema.parse(await request.json());
     const profile = await setUserDisabled(uid, disabled);
@@ -31,9 +31,9 @@ export async function PATCH(request: NextRequest, { params }: Context) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Context) {
+export async function DELETE(request: NextRequest, { params }: Context) {
   try {
-    await requireAdmin();
+    await requireAdmin(request);
     const { uid } = await params;
     await deleteUserCompletely(uid);
     return NextResponse.json({ ok: true });

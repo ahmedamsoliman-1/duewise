@@ -1,6 +1,6 @@
 import "server-only";
 
-import { adminAuth } from "@/lib/firebase/admin";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { buildProfile, deleteUserData, getUserDetail } from "@/lib/firestore/users";
 import type { PlatformStats, UserDetail, UserProfile } from "@/types/user";
 
@@ -9,7 +9,10 @@ export async function listAllUsers(): Promise<UserProfile[]> {
   let pageToken: string | undefined;
   do {
     const result = await adminAuth().listUsers(1000, pageToken);
-    for (const record of result.users) users.push(buildProfile(record));
+    for (const record of result.users) {
+      const snapshot = await adminDb().collection("users").doc(record.uid).get();
+      users.push(buildProfile(record, snapshot.data()));
+    }
     pageToken = result.pageToken;
   } while (pageToken);
   // Newest first.

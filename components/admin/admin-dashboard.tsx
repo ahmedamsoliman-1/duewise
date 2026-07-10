@@ -3,6 +3,7 @@
 import {
   Ban,
   CheckCircle2,
+  Lock,
   LogOut,
   RefreshCw,
   Search,
@@ -11,6 +12,7 @@ import {
   UserCheck,
   Users
 } from "lucide-react";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +20,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/badge";
 import { DuewiseMark } from "@/components/ui/duewise-logo";
+import { auth } from "@/lib/firebase/client";
+import { ADMIN_EMAIL } from "@/lib/admin/constants";
 import type { PlatformStats, UserProfile } from "@/types";
 
-async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
+async function adminFetch<T>(path: string, user: User, init?: RequestInit): Promise<T> {
+  const token = await user.getIdToken();
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...init?.headers
+    }
+  });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.error ?? "Request failed.");
@@ -37,29 +49,41 @@ function providerLabel(user: UserProfile) {
 
 export function AdminDashboard() {
   const router = useRouter();
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [users, setUsers] = useState<UserProfile[] | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [busyUid, setBusyUid] = useState("");
 
+  const isAdmin = authUser?.email?.toLowerCase() === ADMIN_EMAIL;
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (nextUser) => {
+      setAuthUser(nextUser);
+      setAuthReady(true);
+    });
+  }, []);
+
   const load = useCallback(async () => {
+    if (!authUser || !isAdmin) return;
     setError("");
     try {
       const [statsRes, usersRes] = await Promise.all([
-        adminFetch<{ data: PlatformStats }>("/api/admin/stats"),
-        adminFetch<{ data: UserProfile[] }>("/api/admin/users")
+        adminFetch<{ data: PlatformStats }>("/api/admin/stats", authUser),
+        adminFetch<{ data: UserProfile[] }>("/api/admin/users", authUser)
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not load admin data.");
     }
-  }, []);
+  }, [authUser, isAdmin]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (authReady) void load();
+  }, [authReady, load]);
 
   const filtered = useMemo(() => {
     if (!users) return [];
@@ -73,8 +97,9 @@ export function AdminDashboard() {
   async function toggleDisabled(user: UserProfile) {
     setBusyUid(user.uid);
     setError("");
+    if (!authUser) return;
     try {
-      const res = await adminFetch<{ data: UserProfile }>(`/api/admin/users/${user.uid}`, {
+      const res = await adminFetch<{ data: UserProfile }>(`/api/admin/users/${user.uid}`, authUser, {
         method: "PATCH",
         body: JSON.stringify({ disabled: !user.disabled })
       });
@@ -91,8 +116,9 @@ export function AdminDashboard() {
     if (!window.confirm(`Permanently delete ${label} and ALL their data? This cannot be undone.`)) return;
     setBusyUid(user.uid);
     setError("");
+    if (!authUser) return;
     try {
-      await adminFetch(`/api/admin/users/${user.uid}`, { method: "DELETE" });
+      await adminFetch(`/api/admin/users/${user.uid}`, authUser, { method: "DELETE" });
       setUsers((current) => current?.filter((item) => item.uid !== user.uid) ?? null);
       void load();
     } catch (nextError) {
@@ -103,9 +129,9 @@ export function AdminDashboard() {
   }
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" }).catch(() => undefined);
-    router.replace("/admin/login");
-    router.refresh();
+    await fetch("/api/mfa/session", { method: "DELETE" }).catch(() => undefined);
+    await signOut(auth);
+    router.replace("/login");
   }
 
   const statCards = stats
@@ -116,6 +142,38 @@ export function AdminDashboard() {
         { label: "Disabled", value: stats.disabledUsers, icon: Ban }
       ]
     : [];
+
+  if (!authReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-bg">
+        <DuewiseMark className="h-12 w-12 animate-pulse" />
+      </main>
+    );
+  }
+
+  if (!authUser || !isAdmin) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-bg px-5">
+        <Card className="max-w-md text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand">
+            <Lock className="h-6 w-6" />
+          </span>
+          <h1 className="mt-4 font-display text-2xl font-extrabold text-ink">Admin access</h1>
+          <p className="mt-2 text-sm text-muted">
+            Sign in with the Firebase account <strong className="text-ink">{ADMIN_EMAIL}</strong> to open the admin console.
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            <Button onClick={() => router.replace("/login")}>Go to login</Button>
+            {authUser && (
+              <Button variant="ghost" onClick={logout}>
+                Sign out
+              </Button>
+            )}
+          </div>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg">
