@@ -32,6 +32,7 @@ import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api/client";
 import { SELF_FAMILY_MEMBER_ID, SELF_FAMILY_MEMBER_LABEL } from "@/lib/family/self";
 import { reorderItems, sortItemsByPosition } from "@/lib/utils/ordering";
+import { buildNextStepDraft } from "@/lib/tasks/follow-up";
 
 type Field = {
   name: string;
@@ -382,6 +383,7 @@ function ResourceGridCards({
   onDelete,
   onDuplicate,
   onComplete,
+  onCompleteAndNext,
   onToggleSelect,
   onDragStart,
   onDragOver,
@@ -401,6 +403,7 @@ function ResourceGridCards({
   onDelete: (id: unknown) => void;
   onDuplicate: (id: unknown) => void;
   onComplete: (id: unknown) => void;
+  onCompleteAndNext: (id: unknown) => void;
   onToggleSelect: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragOver: (event: React.DragEvent<HTMLElement>) => void;
@@ -473,9 +476,14 @@ function ResourceGridCards({
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                   {showQuickComplete ? (
-                    <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
-                      <CheckCircle2 className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
+                        <CheckCircle2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onCompleteAndNext(item.id)} title="Complete and add next step">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </>
                   ) : null}
                   <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => onEdit(item)} title="Edit">
                     <Edit2 className="h-4 w-4" />
@@ -534,6 +542,7 @@ function TaskMobileCard({
   onDelete,
   onDuplicate,
   onComplete,
+  onCompleteAndNext,
   onToggleSelect,
   selectedIds,
   showQuickComplete = false
@@ -545,6 +554,7 @@ function TaskMobileCard({
   onDelete: (id: unknown) => void;
   onDuplicate: (id: unknown) => void;
   onComplete: (id: unknown) => void;
+  onCompleteAndNext: (id: unknown) => void;
   onToggleSelect: (id: string) => void;
   selectedIds: string[];
   showQuickComplete?: boolean;
@@ -580,9 +590,14 @@ function TaskMobileCard({
         </div>
         <div className="flex shrink-0 gap-1.5">
           {showQuickComplete ? (
-            <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
-              <CheckCircle2 className="h-4 w-4" />
-            </Button>
+            <>
+              <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
+                <CheckCircle2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onCompleteAndNext(item.id)} title="Complete and add next step">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </>
           ) : null}
           <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => onEdit(item)} title="Edit">
             <Edit2 className="h-4 w-4" />
@@ -849,6 +864,38 @@ export function ResourcePage({
       setSelectedIds([]);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not complete selected items.");
+    }
+  }
+
+  async function completeAndCreateNextStep(id: unknown) {
+    if (typeof id !== "string") return;
+    const source = items.find((item) => String(item.id) === id);
+    if (!source) return;
+    setError("");
+    try {
+      const response = await apiFetch<ApiItem>(endpoint, {
+        method: "PATCH",
+        body: JSON.stringify({ id, status: "completed" })
+      });
+      setItems((current) => current.map((item) => (String(item.id) === id ? response.data : item)));
+      setSelectedIds((current) => current.filter((itemId) => itemId !== id));
+
+      const draft = buildNextStepDraft(source);
+      setEditing(null);
+      setFormOpen(true);
+      form.reset({
+        ...defaults,
+        title: draft.title,
+        category: draft.category,
+        status: "upcoming",
+        notes: draft.notes,
+        familyMemberId: draft.familyMemberId,
+        linkedDocumentId: draft.linkedDocumentId,
+        linkedInventoryItemId: draft.linkedInventoryItemId
+      });
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Could not complete item.");
     }
   }
 
@@ -1266,6 +1313,7 @@ export function ResourcePage({
               onDelete={remove}
               onDuplicate={duplicate}
               onComplete={completeItem}
+              onCompleteAndNext={completeAndCreateNextStep}
               onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id])}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
@@ -1291,6 +1339,7 @@ export function ResourcePage({
                   onDelete={remove}
                   onDuplicate={duplicate}
                   onComplete={completeItem}
+                  onCompleteAndNext={completeAndCreateNextStep}
                   onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((itemId) => itemId !== id) : [...current, id])}
                   selectedIds={selectedIds}
                   showQuickComplete={endpoint === "/api/tasks"}
@@ -1360,9 +1409,14 @@ export function ResourcePage({
                       <td className="px-5 py-3.5">
                         <div className="flex justify-end gap-1.5">
                           {endpoint === "/api/tasks" ? (
-                            <Button variant="secondary" size="icon" className="h-9 w-9" disabled={String(item.status ?? "").toLowerCase() === "completed"} onClick={() => completeItem(item.id)} title={String(item.status ?? "").toLowerCase() === "completed" ? "Completed" : "Complete"}>
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button variant="secondary" size="icon" className="h-9 w-9" disabled={String(item.status ?? "").toLowerCase() === "completed"} onClick={() => completeItem(item.id)} title={String(item.status ?? "").toLowerCase() === "completed" ? "Completed" : "Complete"}>
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9" disabled={String(item.status ?? "").toLowerCase() === "completed"} onClick={() => completeAndCreateNextStep(item.id)} title="Complete and add next step">
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </>
                           ) : null}
                           <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => startEdit(item)} title="Edit">
                             <Edit2 className="h-4 w-4" />
