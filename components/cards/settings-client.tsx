@@ -1,13 +1,59 @@
 "use client";
 
-import { Info, Moon, Sun, UploadCloud, UserRound } from "lucide-react";
+import { BellRing, Info, Moon, Sun, UploadCloud, UserRound } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useTheme } from "@/components/layout/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { apiFetch } from "@/lib/api/client";
+import { requestFcmToken } from "@/lib/firebase/client";
+
+type NotificationPreferences = {
+  browserPushEnabled: boolean;
+  dailyDigestEnabled: boolean;
+};
 
 export function SettingsClient() {
   const { theme, setTheme } = useTheme();
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState("");
+  const [notificationBusy, setNotificationBusy] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ data: NotificationPreferences }>("/api/notifications/preferences")
+      .then((response) => setPreferences(response.data))
+      .catch(() => setPreferences({ browserPushEnabled: false, dailyDigestEnabled: true }));
+  }, []);
+
+  async function enablePush() {
+    setNotificationBusy(true);
+    setNotificationStatus("");
+    try {
+      const token = await requestFcmToken();
+      if (!token) throw new Error("Could not create a browser push token.");
+      await apiFetch("/api/notifications/register-token", {
+        method: "POST",
+        body: JSON.stringify({ token, permission: "granted" })
+      });
+      setPreferences({ browserPushEnabled: true, dailyDigestEnabled: true });
+      setNotificationStatus("Browser push is enabled for this device.");
+    } catch (error) {
+      setNotificationStatus(error instanceof Error ? error.message : "Could not enable browser push.");
+    } finally {
+      setNotificationBusy(false);
+    }
+  }
+
+  async function toggleDigest() {
+    if (!preferences) return;
+    const next = !preferences.dailyDigestEnabled;
+    setPreferences({ ...preferences, dailyDigestEnabled: next });
+    await apiFetch<{ data: NotificationPreferences }>("/api/notifications/preferences", {
+      method: "PATCH",
+      body: JSON.stringify({ dailyDigestEnabled: next })
+    }).catch(() => setPreferences(preferences));
+  }
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6">
@@ -58,6 +104,43 @@ export function SettingsClient() {
               Open profile
             </Button>
           </Link>
+        </Card>
+
+        {/* Notifications */}
+        <Card>
+          <CardHeader
+            icon={<BellRing className="h-5 w-5" />}
+            title="Notifications"
+            description="Free browser push via Firebase Cloud Messaging."
+          />
+          <div className="grid gap-4">
+            <div className="rounded-xl bg-panel/50 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-ink">Browser push</p>
+                  <p className="mt-1 text-sm text-muted">Get daily attention alerts on this device.</p>
+                </div>
+                <Button variant={preferences?.browserPushEnabled ? "secondary" : "primary"} size="sm" disabled={notificationBusy} onClick={enablePush}>
+                  <BellRing className="h-4 w-4" />
+                  {preferences?.browserPushEnabled ? "Refresh" : "Enable"}
+                </Button>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 text-left"
+              onClick={toggleDigest}
+            >
+              <span>
+                <span className="block font-semibold text-ink">Daily attention digest</span>
+                <span className="text-sm text-muted">One push per day when something needs attention.</span>
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${preferences?.dailyDigestEnabled ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-panel text-muted"}`}>
+                {preferences?.dailyDigestEnabled ? "On" : "Off"}
+              </span>
+            </button>
+            {notificationStatus && <p className="text-sm font-medium text-muted">{notificationStatus}</p>}
+          </div>
         </Card>
 
         {/* Storage */}

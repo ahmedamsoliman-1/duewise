@@ -49,6 +49,31 @@ Duewise is a single Next.js Backend-for-Frontend app for personal life admin and
 
 5. Open `http://localhost:3000`.
 
+## Free Notifications
+
+Duewise uses Firebase Cloud Messaging for free browser push notifications. Users enable push from Settings, which stores a browser FCM token under their user document in Firestore.
+
+Set these environment variables:
+
+```bash
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your_web_push_certificate_key
+CRON_SECRET=long_random_shared_secret
+```
+
+Get `NEXT_PUBLIC_FIREBASE_VAPID_KEY` from Firebase Console:
+
+```text
+Project settings -> Cloud Messaging -> Web Push certificates
+```
+
+For free scheduled delivery, create a cron-job.org job that calls:
+
+```text
+https://YOUR_DOMAIN/api/cron/notifications?secret=YOUR_CRON_SECRET
+```
+
+Run it once per day. The endpoint sends at most one attention digest push per user per day and records delivery under `notificationDeliveries` to avoid duplicates.
+
 ## Firebase Data Model
 
 All application data is scoped under:
@@ -82,6 +107,9 @@ The app uses one codebase for frontend pages and server-side BFF routes:
 - `/api/subscriptions`
 - `/api/inventory`
 - `/api/inventory/upload-url`
+- `/api/notifications/preferences`
+- `/api/notifications/register-token`
+- `/api/cron/notifications`
 - `/api/family`
 - `/api/life-events`
 - `/api/dashboard`

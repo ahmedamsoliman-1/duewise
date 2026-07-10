@@ -17,10 +17,11 @@ import {
   X
 } from "lucide-react";
 import { signOut } from "firebase/auth";
+import { getMessaging, isSupported, onMessage } from "firebase/messaging";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase/client";
+import { auth, firebaseApp } from "@/lib/firebase/client";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useTheme } from "@/components/layout/theme-provider";
@@ -89,6 +90,33 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
   );
 }
 
+function ForegroundNotifications() {
+  useEffect(() => {
+    let unsubscribe: undefined | (() => void);
+
+    async function listen() {
+      if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return;
+      if (!(await isSupported())) return;
+      const messaging = getMessaging(firebaseApp);
+      unsubscribe = onMessage(messaging, (payload) => {
+        const title = payload.notification?.title ?? "Duewise";
+        const body = payload.notification?.body ?? "You have life admin that needs attention.";
+        const url = payload.data?.url ?? "/dashboard";
+        const notification = new Notification(title, { body, icon: "/icon.svg" });
+        notification.onclick = () => {
+          window.focus();
+          window.location.assign(url);
+        };
+      });
+    }
+
+    void listen();
+    return () => unsubscribe?.();
+  }, []);
+
+  return null;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { loading, user } = useAuth();
@@ -122,6 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-bg lg:flex">
+      <ForegroundNotifications />
       {/* Desktop sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col lg:border-r lg:border-line lg:bg-surface">
         <div className="flex h-full flex-col p-4">

@@ -2,6 +2,7 @@
 
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -17,3 +18,19 @@ export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(fireb
 export const auth = getAuth(firebaseApp);
 export const storage = getStorage(firebaseApp);
 export const googleProvider = new GoogleAuthProvider();
+
+export async function requestFcmToken() {
+  if (typeof window === "undefined") return undefined;
+  const supported = await isSupported();
+  if (!supported) throw new Error("Browser push notifications are not supported here.");
+
+  const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+  if (!vapidKey) throw new Error("Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY.");
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("Notifications permission was not granted.");
+
+  const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  const messaging = getMessaging(firebaseApp);
+  return getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+}
