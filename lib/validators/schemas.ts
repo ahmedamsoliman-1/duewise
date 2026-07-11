@@ -5,6 +5,14 @@ const optionalUrl = z.string().url().optional().or(z.literal(""));
 const optionalFileRef = z.string().trim().optional().or(z.literal(""));
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.");
 const optionalDate = date.optional().or(z.literal(""));
+const relationIds = z.preprocess(
+  (value) => {
+    if (Array.isArray(value)) return value.filter((item) => typeof item === "string" && item.trim());
+    if (typeof value === "string" && value.trim()) return [value.trim()];
+    return [];
+  },
+  z.array(z.string().trim()).default([])
+);
 
 export const taskSchema = z.object({
   title: z.string().trim().min(1),
@@ -63,9 +71,8 @@ export const inventorySchema = z.object({
   purchasePrice: z.coerce.number().min(0).optional().or(z.literal("")),
   currency: z.string().trim().min(3).max(3).default("USD"),
   warrantyExpiryDate: optionalDate,
+  documentIds: relationIds,
   receiptDocumentId: optionalText,
-  imageUrl: optionalFileRef,
-  storagePath: optionalText,
   notes: optionalText
 });
 

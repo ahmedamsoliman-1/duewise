@@ -2,6 +2,7 @@
 
 import { ResourcePage } from "@/components/tables/resource-page";
 import { calculateTaskStatus } from "@/lib/dates/status";
+import { defaultWorkspaceOptions } from "@/lib/options/defaults";
 import { buildReminderDates } from "@/lib/reminders/defaults";
 import { taskSchema } from "@/lib/validators/schemas";
 
@@ -117,7 +118,7 @@ export default function TasksPage() {
       }}
       fields={[
         { name: "title", label: "Title", placeholder: "Passport renewal" },
-        { name: "category", label: "Category", type: "select", options: ["Identity", "Vehicle", "Home", "Health", "School", "Tax", "Insurance", "Other"] },
+        { name: "category", label: "Category", type: "select", options: defaultWorkspaceOptions.taskCategories, optionSetKey: "taskCategories", quickFilter: true },
         { name: "dueDate", label: "Due date", type: "date" },
         { name: "status", label: "Status", type: "select", options: ["upcoming", "due soon", "overdue", "completed"] },
         { name: "recurrenceInterval", label: "Repeat", type: "select", options: ["none", "weekly", "monthly", "yearly"] },
@@ -159,11 +160,7 @@ export default function TasksPage() {
       quickFilters={[
         { label: "Due soon", key: "status", value: "due soon" },
         { label: "Overdue", key: "status", value: "overdue" },
-        { label: "Completed", key: "status", value: "completed" },
-        { label: "Identity", key: "category", value: "Identity" },
-        { label: "Vehicle", key: "category", value: "Vehicle" },
-        { label: "Health", key: "category", value: "Health" },
-        { label: "School", key: "category", value: "School" }
+        { label: "Completed", key: "status", value: "completed" }
       ]}
     />
   );

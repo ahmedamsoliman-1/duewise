@@ -1,6 +1,7 @@
 "use client";
 
 import { ResourcePage } from "@/components/tables/resource-page";
+import { defaultWorkspaceOptions } from "@/lib/options/defaults";
 import { subscriptionSchema } from "@/lib/validators/schemas";
 
 function prepareSubscription(values: Record<string, unknown>) {
@@ -79,7 +80,7 @@ export default function SubscriptionsPage() {
       defaults={{ name: "", category: "Software", cost: 0, currency: "USD", billingCycle: "monthly", nextBillingDate: "", recurrenceInterval: "none", recurrenceEndDate: "", cancellationUrl: "", status: "active", notes: "" }}
       fields={[
         { name: "name", label: "Name", placeholder: "Cloud storage" },
-        { name: "category", label: "Category", type: "select", options: ["Software", "Streaming", "Utilities", "Insurance", "Membership", "Education", "Other"] },
+        { name: "category", label: "Category", type: "select", options: defaultWorkspaceOptions.subscriptionCategories, optionSetKey: "subscriptionCategories", quickFilter: true },
         { name: "cost", label: "Cost", type: "number" },
         { name: "currency", label: "Currency", placeholder: "USD" },
         { name: "billingCycle", label: "Billing cycle", type: "select", options: ["monthly", "yearly", "weekly"] },
@@ -107,9 +108,7 @@ export default function SubscriptionsPage() {
         { label: "Paused", key: "status", value: "paused" },
         { label: "Cancelled", key: "status", value: "cancelled" },
         { label: "Monthly", key: "billingCycle", value: "monthly" },
-        { label: "Yearly", key: "billingCycle", value: "yearly" },
-        { label: "Software", key: "category", value: "Software" },
-        { label: "Insurance", key: "category", value: "Insurance" }
+        { label: "Yearly", key: "billingCycle", value: "yearly" }
       ]}
     />
   );

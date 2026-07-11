@@ -1,6 +1,7 @@
 "use client";
 
 import { ResourcePage } from "@/components/tables/resource-page";
+import { defaultWorkspaceOptions } from "@/lib/options/defaults";
 import { documentSchema } from "@/lib/validators/schemas";
 
 const documentTemplates = [
@@ -77,7 +78,7 @@ export default function DocumentsPage() {
       defaults={{ title: "", type: "Passport", ownerName: "", fileUrl: "", storagePath: "", issueDate: "", expiryDate: "", tags: "", notes: "", familyMemberId: "" }}
       fields={[
         { name: "title", label: "Title", placeholder: "Passport scan" },
-        { name: "type", label: "Type", type: "select", options: ["Passport", "ID", "Visa", "Lease", "Insurance policy", "Medical record", "Receipt", "Warranty", "Contract", "Certificate"] },
+        { name: "type", label: "Type", type: "select", options: defaultWorkspaceOptions.documentTypes, optionSetKey: "documentTypes", quickFilter: true },
         { name: "ownerName", label: "Owner name", placeholder: "Person or household" },
         {
           name: "familyMemberId",
@@ -117,9 +118,6 @@ export default function DocumentsPage() {
       templates={documentTemplates}
       preferredListView="grid"
       quickFilters={[
-        { label: "Passport", key: "type", value: "Passport" },
-        { label: "ID", key: "type", value: "ID" },
-        { label: "Visa", key: "type", value: "Visa" },
         { label: "Contracts", key: "type", predicate: (item) => item.type === "Contract" || item.type === "Lease" },
         { label: "With file", key: "storagePath", predicate: (item) => Boolean(item.storagePath) },
         { label: "Missing file", key: "storagePath", predicate: (item) => !item.storagePath },

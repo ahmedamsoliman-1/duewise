@@ -29,14 +29,17 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api/client";
 import { SELF_FAMILY_MEMBER_ID, SELF_FAMILY_MEMBER_LABEL } from "@/lib/family/self";
+import { defaultWorkspaceOptions, type WorkspaceOptionSetKey, type WorkspaceOptions } from "@/lib/options/defaults";
 import { reorderItems, sortItemsByPosition } from "@/lib/utils/ordering";
 import { buildNextStepDraft } from "@/lib/tasks/follow-up";
 
 type Field = {
   name: string;
   label: string;
-  type?: "text" | "date" | "number" | "textarea" | "select" | "url" | "relation" | "file";
+  type?: "text" | "date" | "number" | "textarea" | "select" | "url" | "relation" | "relations" | "file";
   options?: string[];
+  optionSetKey?: WorkspaceOptionSetKey;
+  quickFilter?: boolean;
   relation?: RelationConfig;
   upload?: UploadConfig;
   placeholder?: string;
@@ -126,7 +129,14 @@ function isPreviewableImage(storagePath: string) {
   return Boolean(extension && imageExtensions.has(extension));
 }
 
-function relationLabel(config: RelationConfig, value: unknown, relationOptions: Record<string, Record<string, string>>) {
+function relationLabel(config: RelationConfig, value: unknown, relationOptions: Record<string, Record<string, string>>): string {
+  if (Array.isArray(value)) {
+    const labels = value
+      .filter((item): item is string => typeof item === "string" && Boolean(item))
+      .map((item) => relationLabel(config, item, relationOptions))
+      .filter((label) => label !== "—");
+    return labels.length ? labels.join(", ") : "—";
+  }
   if (!value || typeof value !== "string") return "—";
   if (config.includeSelf && value === SELF_FAMILY_MEMBER_ID) return SELF_FAMILY_MEMBER_LABEL;
   return relationOptions[config.endpoint]?.[value] ?? value;
@@ -156,8 +166,31 @@ function renderCell(
   downloadingPath: string,
   previewUrls: Record<string, string>
 ) {
-  const raw = item[column.key];
-  if (column.relation) return relationLabel(column.relation, raw, relationOptions);
+  const raw =
+    column.key === "documentIds" &&
+    (!Array.isArray(item.documentIds) || item.documentIds.length === 0) &&
+    typeof item.receiptDocumentId === "string" &&
+    item.receiptDocumentId
+      ? [item.receiptDocumentId]
+      : item[column.key];
+  if (column.relation) {
+    if (Array.isArray(raw)) {
+      const labels = raw
+        .filter((item): item is string => typeof item === "string" && Boolean(item))
+        .map((item) => relationLabel(column.relation!, item, relationOptions))
+        .filter((label) => label !== "—");
+      if (labels.length === 0) return "—";
+      return (
+        <div className="flex min-w-0 flex-wrap justify-end gap-1.5 md:justify-start">
+          {labels.slice(0, 3).map((label) => (
+            <Badge key={label} tone="neutral">{label}</Badge>
+          ))}
+          {labels.length > 3 ? <Badge tone="brand">+{labels.length - 3}</Badge> : null}
+        </div>
+      );
+    }
+    return relationLabel(column.relation, raw, relationOptions);
+  }
   if (column.key === "storagePath") {
     if (!raw || typeof raw !== "string") return "—";
     return (
@@ -668,18 +701,47 @@ export function ResourcePage({
     resolver: zodResolver(schema),
     defaultValues: defaults
   });
+  const optionSetKeys = useMemo(
+    () => Array.from(new Set(fields.map((field) => field.optionSetKey).filter((key): key is WorkspaceOptionSetKey => Boolean(key)))),
+    [fields]
+  );
+  const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOptions>(defaultWorkspaceOptions);
+  const effectiveFields = useMemo(
+    () =>
+      fields.map((field) =>
+        field.optionSetKey ? { ...field, options: workspaceOptions[field.optionSetKey] ?? field.options } : field
+      ),
+    [fields, workspaceOptions]
+  );
+  const dynamicQuickFilters = useMemo<QuickFilter[]>(
+    () =>
+      effectiveFields
+        .filter((field) => field.quickFilter && field.optionSetKey)
+        .flatMap((field) => (field.options ?? []).map((option) => ({ label: option, key: field.name, value: option }))),
+    [effectiveFields]
+  );
+  const effectiveQuickFilters = useMemo(() => {
+    const seen = new Set<string>();
+    return [...quickFilters, ...dynamicQuickFilters].filter((filter) => {
+      const key = `${filter.key}:${filter.label}:${filter.value ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [dynamicQuickFilters, quickFilters]);
+
   const relationKey = useMemo(() => {
     const configs = [
-      ...fields.map((field) => field.relation),
+      ...effectiveFields.map((field) => field.relation),
       ...columns.map((column) => column.relation),
-      ...quickFilters.map((filter) => filter.relation)
+      ...effectiveQuickFilters.map((filter) => filter.relation)
     ].filter(Boolean) as RelationConfig[];
     return JSON.stringify(configs.map((config) => `${config.endpoint}:${config.labelKey}:${config.emptyLabel ?? ""}:${config.includeSelf ? "self" : ""}`).sort());
-  }, [columns, fields, quickFilters]);
+  }, [columns, effectiveFields, effectiveQuickFilters]);
 
   const filtered = useMemo(() => {
     const needle = query.toLowerCase();
-    const selected = quickFilters.find((filter) => filter.label === activeFilter);
+    const selected = effectiveQuickFilters.find((filter) => filter.label === activeFilter);
     return sortItemsByPosition(
       items.filter((item) => {
         const matchesSearch = JSON.stringify(item).toLowerCase().includes(needle);
@@ -687,11 +749,11 @@ export function ResourcePage({
         return matchesSearch && matchesFilter;
       }) as Array<Record<string, unknown> & { id: string }>
     ) as Record<string, unknown>[];
-  }, [activeFilter, items, query, quickFilters]);
+  }, [activeFilter, effectiveQuickFilters, items, query]);
 
   const filterCounts = useMemo(
-    () => Object.fromEntries(quickFilters.map((filter) => [filter.label, items.filter((item) => filterMatches(filter, item)).length])),
-    [items, quickFilters]
+    () => Object.fromEntries(effectiveQuickFilters.map((filter) => [filter.label, items.filter((item) => filterMatches(filter, item)).length])),
+    [effectiveQuickFilters, items]
   );
 
   const previewPathKey = useMemo(() => {
@@ -720,10 +782,25 @@ export function ResourcePage({
   }, [load]);
 
   useEffect(() => {
+    if (optionSetKeys.length === 0) return;
+    let alive = true;
+    apiFetch<{ data: WorkspaceOptions }>("/api/settings/options")
+      .then((response) => {
+        if (alive) setWorkspaceOptions({ ...defaultWorkspaceOptions, ...response.data });
+      })
+      .catch(() => {
+        if (alive) setWorkspaceOptions(defaultWorkspaceOptions);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [optionSetKeys]);
+
+  useEffect(() => {
     const configs = [
-      ...fields.map((field) => field.relation),
+      ...effectiveFields.map((field) => field.relation),
       ...columns.map((column) => column.relation),
-      ...quickFilters.map((filter) => filter.relation)
+      ...effectiveQuickFilters.map((filter) => filter.relation)
     ].filter(Boolean) as RelationConfig[];
     const unique = Array.from(new Map(configs.map((config) => [config.endpoint, config])).values());
     if (unique.length === 0) return;
@@ -754,7 +831,7 @@ export function ResourcePage({
     return () => {
       alive = false;
     };
-  }, [columns, fields, quickFilters, relationKey]);
+  }, [columns, effectiveFields, effectiveQuickFilters, relationKey]);
 
   useEffect(() => {
     const paths = JSON.parse(previewPathKey) as string[];
@@ -787,9 +864,18 @@ export function ResourcePage({
   }, [previewPathKey, previewUrls]);
 
   function startEdit(item: Record<string, unknown>) {
+    const normalizedItem = { ...item };
+    if (
+      Array.isArray(defaults.documentIds) &&
+      (!Array.isArray(normalizedItem.documentIds) || normalizedItem.documentIds.length === 0) &&
+      typeof normalizedItem.receiptDocumentId === "string" &&
+      normalizedItem.receiptDocumentId
+    ) {
+      normalizedItem.documentIds = [normalizedItem.receiptDocumentId];
+    }
     setEditing(item);
     setFormOpen(true);
-    form.reset({ ...defaults, ...item });
+    form.reset({ ...defaults, ...normalizedItem });
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1107,7 +1193,7 @@ export function ResourcePage({
             }
           />
           <form className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={form.handleSubmit(submit)}>
-            {fields.map((field) => (
+            {effectiveFields.map((field) => (
               <Label key={field.name}>
                 {field.label}
                 {field.type === "textarea" ? (
@@ -1189,6 +1275,31 @@ export function ResourcePage({
                       </option>
                     ))}
                   </Select>
+                ) : field.type === "relations" && field.relation ? (
+                  <div className="grid max-h-52 gap-2 overflow-y-auto rounded-2xl border border-line bg-panel/35 p-3">
+                    {Object.entries(relationOptions[field.relation.endpoint] ?? {}).length === 0 ? (
+                      <span className="text-sm font-normal text-muted">{field.relation.emptyLabel ?? "No options yet"}</span>
+                    ) : (
+                      Object.entries(relationOptions[field.relation.endpoint] ?? {}).map(([id, label]) => {
+                        const current = form.watch(field.name);
+                        const selected = Array.isArray(current) ? current.map(String) : typeof current === "string" && current ? [current] : [];
+                        return (
+                          <div key={id} className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm font-medium text-ink">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-brand"
+                              checked={selected.includes(id)}
+                              onChange={(event) => {
+                                const next = event.target.checked ? [...selected, id] : selected.filter((value) => value !== id);
+                                form.setValue(field.name, next, { shouldDirty: true, shouldValidate: true });
+                              }}
+                            />
+                            <span className="min-w-0 truncate">{label}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 ) : (
                   <Input type={field.type ?? "text"} placeholder={field.placeholder} {...form.register(field.name)} />
                 )}
@@ -1213,7 +1324,7 @@ export function ResourcePage({
         </p>
       )}
 
-      {!formOpen && quickFilters.length > 0 && (
+      {!formOpen && effectiveQuickFilters.length > 0 && (
         <Card className="p-3 sm:p-4">
           <div className="flex max-w-full flex-wrap gap-2">
             <button
@@ -1226,7 +1337,7 @@ export function ResourcePage({
               All
               <span className="rounded-full bg-surface/80 px-1.5 text-xs text-ink/70">{items.length}</span>
             </button>
-            {quickFilters.map((filter) => (
+            {effectiveQuickFilters.map((filter) => (
               <button
                 key={filter.label}
                 type="button"

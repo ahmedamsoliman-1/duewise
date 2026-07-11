@@ -1,6 +1,7 @@
 "use client";
 
 import { ResourcePage } from "@/components/tables/resource-page";
+import { defaultWorkspaceOptions } from "@/lib/options/defaults";
 import { inventorySchema } from "@/lib/validators/schemas";
 
 const inventoryTemplates = [
@@ -56,6 +57,20 @@ const inventoryTemplates = [
   }
 ];
 
+function prepareInventory(values: Record<string, unknown>) {
+  const documentIds = Array.isArray(values.documentIds)
+    ? values.documentIds.filter((value): value is string => typeof value === "string" && Boolean(value))
+    : [];
+  const legacyReceiptId = typeof values.receiptDocumentId === "string" && values.receiptDocumentId ? values.receiptDocumentId : "";
+  const uniqueDocumentIds = Array.from(new Set(legacyReceiptId ? [...documentIds, legacyReceiptId] : documentIds));
+
+  return {
+    ...values,
+    documentIds: uniqueDocumentIds,
+    receiptDocumentId: uniqueDocumentIds[0] ?? ""
+  };
+}
+
 export default function InventoryPage() {
   return (
     <ResourcePage
@@ -63,31 +78,19 @@ export default function InventoryPage() {
       description="Catalog valuable household items for warranties, repairs, resale, and insurance claims."
       endpoint="/api/inventory"
       schema={inventorySchema}
-      defaults={{ name: "", category: "Electronics", purchaseDate: "", purchasePrice: 0, currency: "USD", warrantyExpiryDate: "", receiptDocumentId: "", imageUrl: "", storagePath: "", notes: "" }}
+      defaults={{ name: "", category: "Electronics", purchaseDate: "", purchasePrice: 0, currency: "USD", warrantyExpiryDate: "", documentIds: [], receiptDocumentId: "", notes: "" }}
       fields={[
         { name: "name", label: "Name", placeholder: "Laptop" },
-        { name: "category", label: "Category", type: "select", options: ["Electronics", "Appliance", "Furniture", "Jewelry", "Vehicle", "Tools", "Other"] },
+        { name: "category", label: "Category", type: "select", options: defaultWorkspaceOptions.inventoryCategories, optionSetKey: "inventoryCategories", quickFilter: true },
         { name: "purchaseDate", label: "Purchase date", type: "date" },
         { name: "purchasePrice", label: "Purchase price", type: "number" },
         { name: "currency", label: "Currency", placeholder: "USD" },
         { name: "warrantyExpiryDate", label: "Warranty expiry", type: "date" },
         {
-          name: "receiptDocumentId",
-          label: "Receipt / warranty document",
-          type: "relation",
-          relation: { endpoint: "/api/documents", labelKey: "title", emptyLabel: "No linked document" }
-        },
-        {
-          name: "imageUpload",
-          label: "Item image",
-          type: "file",
-          placeholder: "Photo of item, receipt, or serial plate",
-          upload: {
-            endpoint: "/api/inventory/upload-url",
-            storagePathField: "storagePath",
-            urlField: "imageUrl",
-            accept: "image/*,.pdf"
-          }
+          name: "documentIds",
+          label: "Linked documents",
+          type: "relations",
+          relation: { endpoint: "/api/documents", labelKey: "title", emptyLabel: "Create documents first, then link receipts, warranties, manuals, photos, or invoices here." }
         },
         { name: "notes", label: "Notes", type: "textarea" }
       ]}
@@ -97,20 +100,15 @@ export default function InventoryPage() {
         { key: "purchasePrice", label: "Value", format: (value, row) => `${row.currency ?? "USD"} ${Number(value ?? 0).toFixed(2)}` },
         { key: "purchaseDate", label: "Purchased" },
         { key: "warrantyExpiryDate", label: "Warranty" },
-        { key: "receiptDocumentId", label: "Document", relation: { endpoint: "/api/documents", labelKey: "title" } },
-        { key: "storagePath", label: "Image", format: (value) => (value ? "Uploaded" : "—") }
+        { key: "documentIds", label: "Documents", relation: { endpoint: "/api/documents", labelKey: "title" } }
       ]}
       emptyTitle="No inventory items yet"
       emptyBody="Add appliances, electronics, furniture, jewelry, and other valuable items while the receipt and warranty details are still easy to find."
       templates={inventoryTemplates}
+      prepareSubmit={prepareInventory}
       quickFilters={[
-        { label: "Electronics", key: "category", value: "Electronics" },
-        { label: "Appliance", key: "category", value: "Appliance" },
-        { label: "Vehicle", key: "category", value: "Vehicle" },
-        { label: "Jewelry", key: "category", value: "Jewelry" },
         { label: "Has warranty", key: "warrantyExpiryDate", predicate: (item) => Boolean(item.warrantyExpiryDate) },
-        { label: "Receipt linked", key: "receiptDocumentId", predicate: (item) => Boolean(item.receiptDocumentId) },
-        { label: "With image", key: "storagePath", predicate: (item) => Boolean(item.storagePath) }
+        { label: "Docs linked", key: "documentIds", predicate: (item) => Array.isArray(item.documentIds) ? item.documentIds.length > 0 : Boolean(item.receiptDocumentId) }
       ]}
     />
   );
