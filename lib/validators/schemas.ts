@@ -108,9 +108,19 @@ export const lifeEventSchema = z.object({
   notes: optionalText
 });
 
+export const streamItemSchema = z.object({
+  message: z.string().trim().max(5000).optional().or(z.literal("")),
+  storagePath: optionalText,
+  fileName: z.string().trim().max(255).optional().or(z.literal("")),
+  contentType: z.string().trim().max(120).optional().or(z.literal(""))
+}).refine((value) => Boolean(value.message || value.storagePath), {
+  message: "Add a message or attach a file."
+});
+
 export type TaskInput = z.infer<typeof taskSchema>;
 export type DocumentInput = z.infer<typeof documentSchema>;
 export type SubscriptionInput = z.infer<typeof subscriptionSchema>;
 export type InventoryInput = z.infer<typeof inventorySchema>;
 export type FamilyInput = z.infer<typeof familySchema>;
 export type LifeEventInput = z.infer<typeof lifeEventSchema>;
+export type StreamItemInput = z.infer<typeof streamItemSchema>;

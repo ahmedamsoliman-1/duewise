@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Settings,
   ShieldCheck,
+  Radio,
   Sun,
   Users,
   Waypoints,
@@ -38,12 +39,13 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, primary: true },
+  { href: "/stream", label: "Stream", icon: Radio, primary: true },
   { href: "/tasks", label: "Tasks", icon: CalendarClock, primary: true },
   { href: "/documents", label: "Documents", icon: FileText, primary: true },
   { href: "/subscriptions", label: "Subscriptions", icon: CreditCard },
   { href: "/inventory", label: "Inventory", icon: Boxes },
   { href: "/family", label: "Family", icon: Users },
-  { href: "/life-events", label: "Life Events", icon: Milestone, primary: true },
+  { href: "/life-events", label: "Life Events", icon: Milestone },
   { href: "/timeline", label: "Timeline", icon: Waypoints },
   { href: "/settings", label: "Settings", icon: Settings }
 ];

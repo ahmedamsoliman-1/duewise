@@ -17,7 +17,8 @@ import {
   UploadCloud,
   UserRound,
   Users,
-  X
+  X,
+  ZoomIn
 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -127,6 +128,10 @@ function uploadErrorMessage(error: unknown) {
 function isPreviewableImage(storagePath: string) {
   const extension = fileExtension(storagePath);
   return Boolean(extension && imageExtensions.has(extension));
+}
+
+function isPreviewablePdf(storagePath: string) {
+  return fileExtension(storagePath) === "pdf";
 }
 
 function relationLabel(config: RelationConfig, value: unknown, relationOptions: Record<string, Record<string, string>>): string {
@@ -449,7 +454,7 @@ function ResourceGridCards({
   const detailColumns = columns.filter((column) => column.key !== titleColumn.key && column.key !== "storagePath");
 
   return (
-    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid min-w-0 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => {
         const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
         const previewUrl = storagePath ? previewUrls[storagePath] : "";
@@ -458,7 +463,7 @@ function ResourceGridCards({
         const completed = String(item.status ?? "").toLowerCase() === "completed";
 
         return (
-          <Card key={String(item.id)} className="overflow-hidden p-0" draggable onDragStart={() => onDragStart(String(item.id))} onDragOver={onDragOver} onDrop={() => onDrop(String(item.id))}>
+          <Card key={String(item.id)} className="flex h-full min-w-0 flex-col overflow-hidden p-0" draggable onDragStart={() => onDragStart(String(item.id))} onDragOver={onDragOver} onDrop={() => onDrop(String(item.id))}>
             <div className="flex items-center justify-between border-b border-line bg-panel/40 px-3 py-2">
               <label className="flex items-center gap-2 text-sm font-medium text-ink/70">
                 <input type="checkbox" checked={selectedIds.includes(String(item.id))} onChange={() => onToggleSelect(String(item.id))} />
@@ -495,8 +500,8 @@ function ResourceGridCards({
               ) : null}
             </button>
 
-            <div className="grid min-w-0 gap-4 p-4">
-              <div className="flex items-start justify-between gap-3">
+            <div className="grid min-w-0 flex-1 grid-rows-[auto_1fr_auto] gap-4 overflow-hidden p-4">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                 <div className="min-w-0">
                   <h3 className="truncate font-display text-lg font-extrabold text-ink">
                     {String(item[titleColumn.key] ?? "Untitled")}
@@ -505,7 +510,7 @@ function ResourceGridCards({
                     {String(item.type ?? item.ownerName ?? "Document")}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-1.5">
+                <div className="flex shrink-0 gap-0.5 sm:gap-1">
                   {showQuickComplete ? (
                     <>
                       <Button variant="secondary" size="icon" className="h-9 w-9" disabled={completed} onClick={() => onComplete(item.id)} title={completed ? "Completed" : "Complete"}>
@@ -530,9 +535,9 @@ function ResourceGridCards({
 
               <dl className="grid gap-2 text-sm">
                 {detailColumns.slice(0, 5).map((column) => (
-                  <div key={column.key} className="flex items-center justify-between gap-3">
-                    <dt className="text-muted">{column.label}</dt>
-                    <dd className="min-w-0 truncate text-right font-medium text-ink/85">
+                  <div key={column.key} className="grid min-w-0 grid-cols-[minmax(4.5rem,auto)_minmax(0,1fr)] items-center gap-3 overflow-hidden">
+                    <dt className="truncate text-muted">{column.label}</dt>
+                    <dd className="min-w-0 max-w-full truncate text-right font-medium text-ink/85" title={String(item[column.key] ?? "")}>
                       {column.relation
                         ? relationLabel(column.relation, item[column.key], relationOptions)
                         : column.format
@@ -693,6 +698,7 @@ export function ResourcePage({
   const [openingPath, setOpeningPath] = useState("");
   const [downloadingPath, setDownloadingPath] = useState("");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [filePreview, setFilePreview] = useState<{ url: string; title: string; kind: "image" | "pdf" } | null>(null);
   const [listView, setListView] = useState<"grid" | "table">(preferredListView ?? "table");
   const [activeFilter, setActiveFilter] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -1078,7 +1084,15 @@ export function ResourcePage({
         method: "POST",
         body: JSON.stringify({ storagePath })
       });
-      window.open(response.data.url, "_blank", "noopener,noreferrer");
+      if (isPreviewablePdf(storagePath) || isPreviewableImage(storagePath)) {
+        setFilePreview({
+          url: response.data.url,
+          title: storagePath.split("/").pop() || "Document preview",
+          kind: isPreviewablePdf(storagePath) ? "pdf" : "image"
+        });
+      } else {
+        window.open(response.data.url, "_blank", "noopener,noreferrer");
+      }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not open file.");
     } finally {
@@ -1113,6 +1127,30 @@ export function ResourcePage({
 
   return (
     <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-6 overflow-hidden">
+      {filePreview ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label={filePreview.title}>
+          <button type="button" className="absolute inset-0" onClick={() => setFilePreview(null)} aria-label="Close preview" />
+          <section className="relative flex h-[min(90vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+            <header className="flex min-w-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <ZoomIn className="h-4 w-4 shrink-0 text-brand" />
+                <h2 className="truncate font-semibold text-ink">{filePreview.title}</h2>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setFilePreview(null)} title="Close preview">
+                <X className="h-5 w-5" />
+              </Button>
+            </header>
+            <div className="min-h-0 flex-1 bg-panel">
+              {filePreview.kind === "pdf" ? (
+                <iframe className="h-full w-full border-0" src={filePreview.url} title={filePreview.title} />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="h-full w-full object-contain" src={filePreview.url} alt={filePreview.title} />
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
       <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink">{title}</h1>

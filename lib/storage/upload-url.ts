@@ -13,7 +13,7 @@ const uploadSchema = z.object({
   contentType: z.string().min(1)
 });
 
-export function makeUploadUrlHandler(kind: "documents" | "inventory") {
+export function makeUploadUrlHandler(kind: "documents" | "inventory" | "stream") {
   return async function POST(request: NextRequest) {
     try {
       const user = await requireUser(request);
